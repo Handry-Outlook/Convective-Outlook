@@ -955,16 +955,44 @@ Convective discussion for Convective Outlook 23012025 0600 - 24012025 0559.kml (
 Add your discussion here.
 
 [Convective Outlook 26012025 0600 - 26012025 1800.kml]
-Convective discussion for Convective Outlook 26012025 0600 - 26012025 1800.kml (Valid from 26/01/2025 06:00 to 26/01/2025 18:00, Version 1):
-Add your discussion here.
+Convective discussion for 26/01/2025 06:00 to 26/01/2025 18:00, Version 1
+Issued at 26/01/2025 01:00
+A complex frontal system will allow milder air mass to push in from the southwest, allowing some convective showers to develop behind the band of rain associated with a warm front, potentially bringing some scattered thunderstorms across SW England and Wales in the late morning into early afternoon. Shallow CAPE with strong low and deep-level shearing will provide an ideal environment for scattered thunderstorms to develop locally. This will often embedded with strong gusts, potentially up to 80 mph locally. Isolated tornado/waterspout is also possible across the English Channel and SW England.
+
+
+
 
 [Convective Outlook 26012025 1800 - 27012025 1800 (1).kml]
-Convective discussion for Convective Outlook 26012025 1800 - 27012025 1800 (1).kml (Valid from 26/01/2025 18:00 to 27/01/2025 18:00, Version 1):
-Add your discussion here.
+Convective discussion for 26/01/2025 18:00 to 27/01/2025 18:00, Version 1
+Issued at 26/01/2025 17:30
+
+A low pressure will develop across the Bay of Biscay due to the interaction of a strong jet stream. This will result in a band of squally showers to develop, often embedded with gusts and thunderstorms, moving from NW France into the English Channel. There is a chance of a tornado or two to develop across NW France, the Channel Islands and southern England overnight. 
+
+There is also a chance of an area of strong gust to develop as the low pressure develops, few high-resolution models are suggesting a hook-like band of rain tracking across England overnight. This is an indication of possibly localised areas of damaging gusts, potentially reaching up to 80 mph in places due to low-level jet winds being brought down to the surface by descending dry air intrusion. Tornado could also be embedded within the hook-like feature, however, the lack of CAPE inland is limiting the risk.
+
+During Monday, further thundery showers will develop along the channel, often embedded with gusts and hail, and are expected to weaken during the evening.
+
+
+
 
 [Convective Outlook 20022025 0600 - 21022025 0559.kml]
 Convective discussion for 20/02/2025 06:00 to 21/02/2025 05:59, Version 1
 Issued at 19/02/2025 19:40
+A complex frontal system associated with a large Atlantic low-pressure system will bring bands of heavy showers across the British Isles from Wednesday night into early Thursday. An occluded front will transport a plume of milder southwesterly winds into many parts of the British Isles on Thursday, followed by modest CAPE values of 400-700 J/kg across the west. 
+
+Showers lingering behind the occluded front will likely turn thundery due to 200 J/kg of 3CAPE combined with moderate shear. The atmospheric profile behind the occluded front does not appear saturated, making it easier for thunderstorms to develop. Low-level shear of 35-45 knots and deep-layer shear of 40-60 knots could help sustain updrafts. If these thundery showers organize sufficiently, there is a chance that a bow echo could develop across central parts of ROI and Northern Ireland, potentially bringing locally damaging gusts, hail, and even one or two tornadoes along its 'tail'. 
+
+Due to strong cross-model agreement on the likelihood of a bow echo, the first enhanced risk of the year has been issued, mainly highlighting the risk of severe thunderstorms between 07Z and 11Z. Due to strong shear, thunderstorms developing across Northern Ireland and ROI will continue moving northeastward into parts of Scotland during the late morning, maintaining a threat of large hail and tornadoes. 
+
+Another lower-confidence risk exists for a second round of thunderstorms across northern England. This will strongly depend on the available moisture remaining in the atmosphere after instability shifts into North Wales and northern England. Given forecasted PWAT values of 15-20 mm, one or two showers could develop and potentially intensify into thunderstorms. Shear will remain strong across the region, meaning there is still a continued tornado threat. If moisture levels are sufficient, one or more squall lines could develop, significantly increasing the chance of tornadoes between broken segments of showers. However, due to uncertainty, only a slight risk has been issued for this scenario.
+
+
+
+
+[Convective Outlook 24022025 0600 - 25022025 0559.kml]
+Convective discussion for 24/02/2025 06:00 to 25/02/2025 05:59Version 1):
+Issued at 24/02/2025 19:40
+TESTING
 A complex frontal system associated with a large Atlantic low-pressure system will bring bands of heavy showers across the British Isles from Wednesday night into early Thursday. An occluded front will transport a plume of milder southwesterly winds into many parts of the British Isles on Thursday, followed by modest CAPE values of 400-700 J/kg across the west. 
 
 Showers lingering behind the occluded front will likely turn thundery due to 200 J/kg of 3CAPE combined with moderate shear. The atmospheric profile behind the occluded front does not appear saturated, making it easier for thunderstorms to develop. Low-level shear of 35-45 knots and deep-layer shear of 40-60 knots could help sustain updrafts. If these thundery showers organize sufficiently, there is a chance that a bow echo could develop across central parts of ROI and Northern Ireland, potentially bringing locally damaging gusts, hail, and even one or two tornadoes along its 'tail'. 

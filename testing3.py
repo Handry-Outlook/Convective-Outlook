@@ -13,6 +13,8 @@ import re
 import json
 import webbrowser
 from collections import defaultdict
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext
 
 # 1. Load and Parse the KML File
 def load_kml(kml_file_path, discussions=None):
@@ -95,14 +97,14 @@ def load_discussions(discussion_file_path):
     print("Loaded discussions for:", list(discussions.keys()))
     return discussions
 
+
+
 # 5. Generate Discussion Template File (Append new KMLs without overwriting)
-def generate_discussion_template(kml_files, discussion_file_path):
-    # Load existing discussions to avoid duplicating entries
+def generate_discussion_template(kml_files, discussion_file_path, root):
     existing_discussions = {}
     if os.path.exists(discussion_file_path):
         with open(discussion_file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            # Split content into sections based on KML headers ([filename])
             sections = re.split(r'\n(?=\[.*\])\n?', content)
             for section in sections:
                 if section.strip():
@@ -114,26 +116,16 @@ def generate_discussion_template(kml_files, discussion_file_path):
     else:
         print(f"Discussion file '{discussion_file_path}' does not exist. Creating new file.")
 
-    # Append new KML entries if they don't already exist
-    new_entries = []
+    new_kmls = []
     for kml_path in kml_files:
         kml_filename = os.path.basename(kml_path)
         if kml_filename not in existing_discussions:
             start, end, version = parse_kml_time(kml_filename)
             if start and end:
-                entry = (f"[{kml_filename}]\n"
-                         f"Convective discussion for {kml_filename} (Valid from {start.strftime('%d/%m/%Y %H:%M')} to {end.strftime('%d/%m/%Y %H:%M')}, Version {version}):\n"
-                         f"Add your discussion here.\n\n")
-                new_entries.append(entry)
-    
-    if new_entries:
-        with open(discussion_file_path, 'a', encoding='utf-8') as f:
-            if not existing_discussions:
-                f.write("# Format: [KML_FILENAME]\n"
-                        "# Discussion text goes here (can span multiple lines)\n"
-                        "# End with a blank line to separate entries\n\n")
-            f.writelines(new_entries)
-        print(f"Appended {len(new_entries)} new KML discussion entries to '{discussion_file_path}'")
+                new_kmls.append((kml_filename, start, end, version))
+
+    if new_kmls:
+        prompt_for_discussions(new_kmls, discussion_file_path, root)
     elif not existing_discussions:
         with open(discussion_file_path, 'w', encoding='utf-8') as f:
             f.write("# Format: [KML_FILENAME]\n"
@@ -142,6 +134,50 @@ def generate_discussion_template(kml_files, discussion_file_path):
         print(f"Created empty discussion template file: {discussion_file_path}")
     else:
         print(f"No new KMLs to add to '{discussion_file_path}'")
+
+def prompt_for_discussions(new_kmls, discussion_file_path, root):
+    discussions = {}
+    
+    def submit_discussion(kml_filename, entry, window):
+        discussion_text = entry.get("1.0", tk.END).strip()
+        if discussion_text:
+            discussions[kml_filename] = discussion_text
+            window.destroy()
+        else:
+            messagebox.showwarning("Empty Discussion", "Please enter a discussion before submitting.")
+
+    for kml_filename, start, end, version in new_kmls:
+        window = tk.Toplevel(root)
+        window.title(f"Discussion for {kml_filename}")
+        window.geometry("400x300")
+        
+        label = ttk.Label(window, text=f"Enter discussion for {kml_filename}\n(Valid from {start.strftime('%d/%m/%Y %H:%M')} to {end.strftime('%d/%m/%Y %H:%M')}, Version {version}):")
+        label.pack(pady=5)
+        
+        entry = scrolledtext.ScrolledText(window, width=40, height=10)
+        entry.pack(pady=5)
+        
+        submit_btn = ttk.Button(window, text="Submit", command=lambda k=kml_filename, e=entry, w=window: submit_discussion(k, e, w))
+        submit_btn.pack(pady=5)
+        
+        window.grab_set()  # Make the window modal
+        root.wait_window(window)  # Wait for the window to close
+
+    # After all discussions are entered, append to file
+    if discussions:
+        with open(discussion_file_path, 'a', encoding='utf-8') as f:
+            if not os.path.exists(discussion_file_path) or os.stat(discussion_file_path).st_size == 0:
+                f.write("# Format: [KML_FILENAME]\n"
+                        "# Discussion text goes here (can span multiple lines)\n"
+                        "# End with a blank line to separate entries\n\n")
+            # Write discussions for only the new KMLs that have been entered
+            for kml_filename, start, end, version in new_kmls:
+                if kml_filename in discussions:
+                    f.write(f"[{kml_filename}]\n"
+                            f"Convective discussion for {start.strftime('%d/%m/%Y %H:%M')} to {end.strftime('%d/%m/%Y %H:%M')}"
+                            f"Version {version}):\n"
+                            f"{discussions[kml_filename]}\n\n")
+        print(f"Appended {len(discussions)} new KML discussion entries to '{discussion_file_path}'")
 
 # 6. Create Mapbox Map with Tooltips, Discussion, and Conditional Text Color
 def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_date):
@@ -200,19 +236,25 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     risk_priority = {'High risk': 2, 'Moderate risk': 3, 'Enhanced risk': 4, 'Slight risk': 5, 'Low risk': 6}
     risk_colors_cal = {'High risk': 'purple', 'Moderate risk': 'red', 'Enhanced risk': 'orange', 'Slight risk': 'yellow', 'Low risk': '#5aac91'}
     date_risks = {}
+    kml_times = {}
+
+    # Process KML data to pick the latest version per day and unique risks
     for kml, (kml_start, kml_end, kml_gdf, version) in all_kmls_data.items():
+        layer_id = kml.split(os.sep)[-1].replace('.kml', '')
+        kml_times[layer_id] = f"Valid from {kml_start.strftime('%d/%m/%Y %H:%M')} to {kml_end.strftime('%d/%m/%Y %H:%M')}"
         current_date_iter = kml_start
         while current_date_iter <= kml_end:
             date_str = current_date_iter.strftime('%Y-%m-%d')
-            if date_str not in date_risks:
-                date_risks[date_str] = []
-            layer_id = kml.split(os.sep)[-1].replace('.kml', '')
-            base_date = kml_start.strftime('%d/%m/%Y')
             version_num = int(version)
+            base_date = kml_start.strftime('%d/%m/%Y')
             label = f"{base_date} Version {version_num}"
-            for _, row in kml_gdf.iterrows():
-                risk = row['Name']
-                date_risks[date_str].append((risk, layer_id, label, version_num))
+            
+            # Only update if this is the first entry or a higher version
+            if date_str not in date_risks or version_num > date_risks[date_str][0][3]:
+                # Get unique risks (e.g., 3 "Slight risk" polygons count as 1 "Slight risk")
+                unique_risks = set(row['Name'] for _, row in kml_gdf.iterrows())
+                risks_for_day = [(risk, layer_id, label, version_num) for risk in unique_risks]
+                date_risks[date_str] = risks_for_day
             current_date_iter += timedelta(days=1)
 
     months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -223,9 +265,9 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
 
     month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     next_month = (month_start.replace(month=month_start.month % 12 + 1) if month_start.month < 12 else month_start.replace(year=month_start.year + 1, month=1))
-    calendar_html = '<table id="calendarTable" style="border-collapse: collapse;"><tr><th colspan="7">' + month_start.strftime('%B %Y') + '</th></tr><tr>'
+    calendar_html = '<table id="calendarTable" style="border-collapse: collapse; width: 100%;"><tr><th colspan="7">' + month_start.strftime('%B %Y') + '</th></tr><tr>'
     for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']:
-        calendar_html += f'<th>{day}</th>'
+        calendar_html += f'<th style="font-size: 0.8em;">{day}</th>'
     calendar_html += '</tr><tr>'
     first_day = month_start.weekday()
     for _ in range(first_day):
@@ -247,7 +289,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             border_style = 'border: 1px solid black'
             kml_id = 'none'
             text_color = 'black'
-        calendar_html += f'<td style="background-color: {bg_color}; {border_style}; text-align: center; cursor: pointer; color: {text_color};" onclick="selectDate(\'{date_str}\');">{current_day.day}</td>'
+        calendar_html += f'<td style="background-color: {bg_color}; {border_style}; text-align: center; cursor: pointer; color: {text_color}; font-size: 0.8em; padding: 0.2em;" onclick="selectDate(\'{date_str}\');">{current_day.day}</td>'
         if current_day.weekday() == 6:
             calendar_html += '</tr><tr>'
         current_day += timedelta(days=1)
@@ -255,37 +297,130 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
 
     map_id = m.get_name()
     layer_groups_json = {k: v.get_name() for k, v in layer_groups.items()}
-    
-    legend_html = '''
-    <div style="position: fixed; top: 10px; left: 10px; width: 300px; height: auto; background-color: white; border: 2px solid grey; z-index: 9999; font-size: 14px; padding: 10px; box-shadow: 2px 2px 6px rgba(0,0,0,0.3);">
-        <b>Weather Risk Legend</b><br>
-        <i style="background: #5aac91; width: 18px; height: 18px; float: left; margin-right: 8px;"></i> Low risk<br>
-        <i style="background: yellow; width: 18px; height: 18px; float: left; margin-right: 8px;"></i> Slight risk<br>
-        <i style="background: orange; width: 18px; height: 18px; float: left; margin-right: 8px;"></i> Enhanced risk<br>
-        <i style="background: red; width: 18px; height: 18px; float: left; margin-right: 8px;"></i> Moderate risk<br>
-        <i style="background: purple; width: 18px; height: 18px; float: left; margin-right: 8px;"></i> High risk<br>
-        <i style="background: black; width: 18px; height: 18px; float: left; margin-right: 8px;"></i> Other risks (flooding, hail, tornado, gusts)<br>
-        <br><b>Select Convective Outlook:</b><br>
-        <select id="kmlDropdown" onchange="showLayer(this.value);"></select>
-        <br><br><b>Convective Discussion:</b><br>
-        <div id="discussionText" style="max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;">Select an outlook to view discussion.</div>
-        <br><b>Risk Calendar:</b><br>
-        <select id="monthDropdown" onchange="updateCalendar();">{0}</select>
-        <select id="yearDropdown" onchange="updateCalendar();">{1}</select>
-        <br><br>
-        <div id="calendarContainer">{2}</div>
+
+    legend_html = f'''
+    <!-- Collapsible legend in top-left corner, collapsed initially -->
+    <div id="legendBox" style="position: fixed; top: 1vh; left: 1vw; width: 20vw; min-width: 200px; max-width: 300px; background-color: white; border: 2px solid grey; z-index: 9999; font-size: 1em; padding: 0.5em; box-shadow: 2px 2px 6px rgba(0,0,0,0.3); box-sizing: border-box;">
+        <button id="toggleLegend" onclick="toggleLegend()" style="width: 100%; min-height: 50px; cursor: pointer; font-size: 1em; padding: 0.5em; box-sizing: border-box;">Detail and Archive</button>
+        <div id="legendContent" style="display: none;">
+            <b>Weather Risk Legend</b><br>
+            <i style="background: #5aac91; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Low risk<br>
+            <i style="background: yellow; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Slight risk<br>
+            <i style="background: orange; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Enhanced risk<br>
+            <i style="background: red; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Moderate risk<br>
+            <i style="background: purple; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> High risk<br>
+            <i style="background: black; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Other risks (flooding, hail, tornado, gusts)<br>
+            <br><b>Select Convective Outlook:</b><br>
+            <select id="kmlDropdown" onchange="showLayer(this.value);" style="width: 100%; padding: 0.3em; font-size: 0.9em;"></select>
+            <br><br>
+            <!-- Collapsible Convective Discussion -->
+            <div style="margin-bottom: 0.5em;">
+                <button onclick="toggleSection('discussionSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Convective Discussion ►</button>
+                <div id="discussionSection" style="display: none;">
+                    <div id="discussionText" style="max-height: 15vh; overflow-y: auto; border: 1px solid #ccc; padding: 0.5em; white-space: pre-wrap; font-size: 0.9em;">Select an outlook to view discussion.</div>
+                </div>
+            </div>
+            <!-- Collapsible Risk Calendar -->
+            <div>
+                <button onclick="toggleSection('calendarSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Risk Calendar ▼</button>
+                <div id="calendarSection" style="display: block;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <select id="monthDropdown" onchange="updateCalendar();" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{month_options}</select>
+                        <select id="yearDropdown" onchange="updateCalendar();" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{year_options}</select>
+                    </div>
+                    <br>
+                    <div id="calendarContainer" style="width: 100%;">{calendar_html}</div>
+                </div>
+            </div>
+            <!-- New Chart Buttons -->
+            <div style="margin-top: 0.5em;">
+                <button onclick="window.open('monthly_charts.html', '_blank')" style="width: 100%; padding: 0.3em; font-size: 0.9em; cursor: pointer;">Monthly Outlook Charts</button>
+                <button onclick="window.open('yearly_charts.html', '_blank')" style="width: 100%; padding: 0.3em; font-size: 0.9em; cursor: pointer; margin-top: 0.3em;">Yearly Outlook Charts</button>
+            </div>
+        </div>
     </div>
+    <!-- Valid time in bottom-left corner -->
+    <div id="validTime" style="position: fixed; bottom: 1vh; left: 1vw; background-color: rgba(255, 255, 255, 0.8); padding: 0.5em 1em; border: 1px solid white; border-radius: 3px; z-index: 9999; font-size: 1.2em;">
+        {kml_times.get(default_layer_id, "No outlook has been issued for this day. Use risk calendar to see archive")}
+    </div>
+    <!-- Responsive styles -->
+    <style>
+        #legendBox {{
+            height: 5vh; /* Initial collapsed height */
+            min-height: 65px; /* Minimum height to match button */
+            transition: height 0.3s ease; /* Smooth transition */
+            overflow: hidden; /* Hide content when collapsed */
+        }}
+        #legendBox.expanded {{
+            height: auto; /* Expand to fit content */
+            max-height: 80vh; /* Cap at 80% of viewport height */
+            overflow-y: auto; /* Scroll if content exceeds max-height */
+        }}
+        /* Hide Mapbox zoom controls */
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in,
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{
+            display: none !important;
+        }}
+        @media (max-width: 600px) {{
+            #legendBox {{
+                width: 50vw;
+                min-width: 150px;
+                font-size: 0.8em;
+                height: 5vh; /* Consistent collapsed height on mobile */
+                min-height: 50px;
+            }}
+            #legendBox.expanded {{
+                width: 50vw;
+                height: auto; /* Expand to fit content */
+                max-height: 80vh; /* Maintain 80% max height */
+                overflow-y: auto;
+            }}
+            #validTime {{
+                font-size: 0.9em;
+                padding: 0.3em 0.6em;
+            }}
+            #calendarTable th, #calendarTable td {{
+                font-size: 0.7em;
+                padding: 0.1em;
+            }}
+            /* Adjust dropdowns on mobile */
+            #calendarSection div {{
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4%;
+            }}
+            #monthDropdown, #yearDropdown {{
+                width: 48%;
+            }}
+        }}
+    </style>
     <script>
-    var layerGroups = {3};
-    var layerDefinitions = {4};
+    var layerGroups = {json.dumps(layer_groups_json, ensure_ascii=False)};
+    var layerDefinitions = {json.dumps(layer_definitions, ensure_ascii=False)};
     var activeLayers = {{}};
-    var dateRisks = {5};
-    var riskColorsCal = {6};
-    var defaultLayerId = '{7}';
-    var riskPriority = {8};
+    var dateRisks = {json.dumps(date_risks, ensure_ascii=False)};
+    var riskColorsCal = {json.dumps(risk_colors_cal, ensure_ascii=False)};
+    var defaultLayerId = '{default_layer_id}';
+    var riskPriority = {json.dumps(risk_priority, ensure_ascii=False)};
+    var kmlTimes = {json.dumps(kml_times, ensure_ascii=False)};
+
+    function toggleSection(sectionId) {{
+        var section = document.getElementById(sectionId);
+        var button = section.previousElementSibling;
+        if (section.style.display === 'none') {{
+            section.style.display = 'block';
+            button.innerHTML = button.innerHTML.replace('►', '▼');
+            if (sectionId === 'calendarSection') {{
+                updateCalendar();
+            }}
+        }} else {{
+            section.style.display = 'none';
+            button.innerHTML = button.innerHTML.replace('▼', '►');
+        }}
+    }}
 
     function showLayer(layerId) {{
-        var map = {9};
+        var map = {map_id};
         console.log('showLayer called with ID: ' + layerId);
         map.eachLayer(function(layer) {{
             if (layer instanceof L.GeoJSON || layer instanceof L.FeatureGroup) {{
@@ -326,26 +461,34 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             activeLayers[layerId] = layer;
             var firstFeature = JSON.parse(layerDefinitions[layerId]).features[0];
             document.getElementById('discussionText').innerHTML = firstFeature.properties.discussion || 'No discussion available.';
+            document.getElementById('validTime').innerHTML = kmlTimes[layerId] || 'Valid time not available';
         }} else {{
             document.getElementById('discussionText').innerHTML = 'Select an outlook to view discussion.';
+            document.getElementById('validTime').innerHTML = 'No convective outlook is avalible for this day, please select another day';
         }}
         document.getElementById('kmlDropdown').value = layerId;
     }}
 
     function updateCalendar() {{
-        var month = parseInt(document.getElementById('monthDropdown').value);
-        var year = parseInt(document.getElementById('yearDropdown').value);
+        var monthDropdown = document.getElementById('monthDropdown');
+        var yearDropdown = document.getElementById('yearDropdown');
+        if (!monthDropdown || !yearDropdown) {{
+            console.log('Dropdowns not found, skipping calendar update');
+            return;
+        }}
+        var month = parseInt(monthDropdown.value);
+        var year = parseInt(yearDropdown.value);
         console.log('Updating calendar for month:', month, 'year:', year);
         var monthStart = new Date(year, month - 1, 1);
         var nextMonth = new Date(year, month, 1);
         var firstDay = monthStart.getDay() === 0 ? 6 : monthStart.getDay() - 1;
         var currentDay = new Date(monthStart);
-        var calendarHtml = '<table style="border-collapse: collapse;" id="calendarTable"><tr><th colspan="7">' + 
+        var calendarHtml = '<table style="border-collapse: collapse; width: 100%;" id="calendarTable"><tr><th colspan="7">' + 
             monthStart.toLocaleString('default', {{month: 'long'}}) + ' ' + year + 
             '</th></tr><tr>';
         var days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         for (var day of days) {{
-            calendarHtml += '<th>' + day + '</th>';
+            calendarHtml += '<th style="font-size: 0.8em;">' + day + '</th>';
         }}
         calendarHtml += '</tr><tr>';
         for (var i = 0; i < firstDay; i++) {{
@@ -368,11 +511,9 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
                 bgColor = highestRisk ? riskColorsCal[highestRisk] || 'white' : 'white';
                 var hasRiskOf = risks.some(function(risk) {{return risk[0].includes('Risk of');}});
                 borderStyle = hasRiskOf ? 'border: 2px solid black' : 'border: 1px solid black';
-                if (bgColor === 'red' || bgColor === 'purple') {{
-                    textColor = 'white';
-                }}
+                textColor = (bgColor === 'red' || bgColor === 'purple') ? 'white' : 'black';
             }}
-            calendarHtml += '<td style="background-color: ' + bgColor + '; ' + borderStyle + '; text-align: center; cursor: pointer; color: ' + textColor + ';" ' +
+            calendarHtml += '<td style="background-color: ' + bgColor + '; ' + borderStyle + '; text-align: center; cursor: pointer; color: ' + textColor + '; font-size: 0.8em; padding: 0.2em;" ' +
                 'onclick="selectDate(\\\'' + dateStr + '\\\');">' + currentDay.getDate() + '</td>';
             if (currentDay.getDay() === 0) {{
                 calendarHtml += '</tr><tr>';
@@ -381,12 +522,21 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         }}
         calendarHtml += '</tr></table>';
         console.log('Replacing calendar HTML');
-        document.getElementById('calendarContainer').innerHTML = calendarHtml;
+        var calendarContainer = document.getElementById('calendarContainer');
+        if (calendarContainer) {{
+            calendarContainer.innerHTML = calendarHtml;
+        }} else {{
+            console.log('Calendar container not found');
+        }}
     }}
 
     function selectDate(dateStr) {{
         console.log('Date selected: ' + dateStr);
         var dropdown = document.getElementById('kmlDropdown');
+        if (!dropdown) {{
+            console.log('kmlDropdown not found');
+            return;
+        }}
         dropdown.innerHTML = '<option value="none">None</option>';
         var risks = dateRisks[dateStr] || [];
         var uniqueKmlsMap = new Map();
@@ -413,29 +563,227 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         showLayer(defaultOption);
     }}
 
+    function toggleLegend() {{
+        var content = document.getElementById('legendContent');
+        var button = document.getElementById('toggleLegend');
+        var legendBox = document.getElementById('legendBox');
+        if (content.style.display === 'none') {{
+            content.style.display = 'block';
+            button.innerHTML = 'Hide';
+            legendBox.classList.add('expanded');
+            updateCalendar();
+        }} else {{
+            content.style.display = 'none';
+            button.innerHTML = 'Detail and Archive';
+            legendBox.classList.remove('expanded');
+        }}
+    }}
+
     document.addEventListener('DOMContentLoaded', function() {{
         console.log('DOM loaded, initializing with default layer: ' + defaultLayerId);
         showLayer(defaultLayerId);
         updateCalendar();
-        selectDate('{10}');
+        selectDate('{current_date.strftime('%Y-%m-%d')}');
+        document.getElementById('monthDropdown').addEventListener('change', updateCalendar);
+        document.getElementById('yearDropdown').addEventListener('change', updateCalendar);
     }});
     </script>
-    '''.format(
-        month_options,
-        year_options,
-        calendar_html,
-        json.dumps(layer_groups_json, ensure_ascii=False),
-        json.dumps(layer_definitions, ensure_ascii=False),
-        json.dumps(date_risks, ensure_ascii=False),
-        json.dumps(risk_colors_cal, ensure_ascii=False),
-        default_layer_id,
-        json.dumps(risk_priority, ensure_ascii=False),
-        map_id,
-        current_date.strftime('%Y-%m-%d')
-    )
+    '''
     m.get_root().html.add_child(folium.Element(legend_html))
     return m
+def analyze_outlook_data(all_kmls_data):
+    monthly_data = defaultdict(lambda: defaultdict(int))
+    yearly_data = defaultdict(lambda: defaultdict(int))
+    risk_levels = ['Low risk', 'Slight risk', 'Enhanced risk', 'Moderate risk', 'High risk']
+    daily_latest_version = {}  # Track latest version per day
 
+    # First pass: Identify the latest version per day
+    for kml, (start, end, kml_data, version) in all_kmls_data.items():
+        current_date = start
+        while current_date <= end:
+            date_str = current_date.strftime('%Y-%m-%d')
+            version_num = int(version)
+            if date_str not in daily_latest_version or version_num > daily_latest_version[date_str][1]:
+                daily_latest_version[date_str] = (kml, version_num, kml_data)
+            current_date += timedelta(days=1)
+
+    # Second pass: Count unique risks only from the latest version per day
+    for date_str, (_, _, kml_data) in daily_latest_version.items():
+        year = int(date_str[:4])
+        month = int(date_str[5:7])
+        month_key = f"{year}-{month:02d}"
+        # Use a set to ensure each risk level is counted only once per day (e.g., 3 "Slight risk" polygons = 1 count)
+        unique_risks = set(row['Name'] for _, row in kml_data.iterrows() if row['Name'] in risk_levels)
+        for risk in unique_risks:
+            monthly_data[month_key][risk] += 1
+            yearly_data[year][risk] += 1
+
+    # Convert to JSON-friendly format
+    monthly_json = {month: dict(risks) for month, risks in monthly_data.items()}
+    yearly_json = {year: dict(risks) for year, risks in yearly_data.items()}
+    
+    return monthly_json, yearly_json
+def create_monthly_chart_html(monthly_data, output_path):
+    html_content = f'''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Monthly Convective Outlook Charts</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                overflow-x: hidden;
+            }}
+            h1 {{
+                font-size: 1.5em;
+                margin-bottom: 10px;
+                text-align: center;
+            }}
+            canvas {{
+                width: 100% !important;
+                max-width: 90vw;
+                height: 70vh !important;
+            }}
+            @media (max-width: 600px) {{
+                h1 {{
+                    font-size: 1.2em;
+                }}
+                canvas {{
+                    max-width: 95vw;
+                    height: 70vh !important;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>Monthly Convective Outlook Counts</h1>
+        <canvas id="monthlyChart"></canvas>
+        <script>
+            const monthlyData = {json.dumps(monthly_data)};
+            const labels = Object.keys(monthlyData).sort();
+            const datasets = [
+                {{ label: 'Low risk', data: labels.map(month => monthlyData[month]['Low risk'] || 0), backgroundColor: '#5aac91' }},
+                {{ label: 'Slight risk', data: labels.map(month => monthlyData[month]['Slight risk'] || 0), backgroundColor: 'yellow' }},
+                {{ label: 'Enhanced risk', data: labels.map(month => monthlyData[month]['Enhanced risk'] || 0), backgroundColor: 'orange' }},
+                {{ label: 'Moderate risk', data: labels.map(month => monthlyData[month]['Moderate risk'] || 0), backgroundColor: 'red' }},
+                {{ label: 'High risk', data: labels.map(month => monthlyData[month]['High risk'] || 0), backgroundColor: 'purple' }}
+            ];
+
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            new Chart(ctx, {{
+                type: 'bar',
+                data: {{ labels: labels, datasets: datasets }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {{
+                        x: {{ stacked: false, title: {{ display: true, text: 'Month (YYYY-MM)', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }} }},
+                        y: {{ stacked: false, title: {{ display: true, text: 'Number of Days', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }}, beginAtZero: true }}
+                    }},
+                    plugins: {{
+                        legend: {{ position: 'top', labels: {{ font: {{ size: 12 }}, padding: 10, boxWidth: 20 }} }},
+                        title: {{ display: true, text: 'Monthly Convective Outlooks by Risk Level', font: {{ size: 16 }} }}
+                    }},
+                    layout: {{ padding: {{ top: 10, bottom: 10, left: 10, right: 10 }} }}
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    '''
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    print(f"Monthly chart HTML saved as {output_path}")
+
+def create_yearly_chart_html(yearly_data, output_path):
+    html_content = f'''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Yearly Convective Outlook Charts</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                overflow-x: hidden;
+            }}
+            h1 {{
+                font-size: 1.5em;
+                margin-bottom: 10px;
+                text-align: center;
+            }}
+            canvas {{
+                width: 100% !important;
+                max-width: 90vw;
+                height: 70vh !important;
+            }}
+            @media (max-width: 600px) {{
+                h1 {{
+                    font-size: 1.2em;
+                }}
+                canvas {{
+                    max-width: 95vw;
+                    height: 70vh !important;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>Yearly Convective Outlook Counts</h1>
+        <canvas id="yearlyChart"></canvas>
+        <script>
+            const yearlyData = {json.dumps(yearly_data)};
+            const labels = Object.keys(yearlyData).sort();
+            const datasets = [
+                {{ label: 'Low risk', data: labels.map(year => yearlyData[year]['Low risk'] || 0), backgroundColor: '#5aac91' }},
+                {{ label: 'Slight risk', data: labels.map(year => yearlyData[year]['Slight risk'] || 0), backgroundColor: 'yellow' }},
+                {{ label: 'Enhanced risk', data: labels.map(year => yearlyData[year]['Enhanced risk'] || 0), backgroundColor: 'orange' }},
+                {{ label: 'Moderate risk', data: labels.map(year => yearlyData[year]['Moderate risk'] || 0), backgroundColor: 'red' }},
+                {{ label: 'High risk', data: labels.map(year => yearlyData[year]['High risk'] || 0), backgroundColor: 'purple' }}
+            ];
+
+            const ctx = document.getElementById('yearlyChart').getContext('2d');
+            new Chart(ctx, {{
+                type: 'bar',
+                data: {{ labels: labels, datasets: datasets }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {{
+                        x: {{ stacked: false, title: {{ display: true, text: 'Year', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }} }},
+                        y: {{ stacked: false, title: {{ display: true, text: 'Number of Days', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }}, beginAtZero: true }}
+                    }},
+                    plugins: {{
+                        legend: {{ position: 'top', labels: {{ font: {{ size: 12 }}, padding: 10, boxWidth: 20 }} }},
+                        title: {{ display: true, text: 'Yearly Convective Outlooks by Risk Level', font: {{ size: 16 }} }}
+                    }},
+                    layout: {{ padding: {{ top: 10, bottom: 10, left: 10, right: 10 }} }}
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    '''
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    print(f"Yearly chart HTML saved as {output_path}")
 # 7. Export Map as Image using Selenium
 def export_map_image(map_object, output_path, width=1360, height=1760):
     map_object.save("temp_map.html")
@@ -456,29 +804,47 @@ def overlay_on_template(map_image_path, template_image_path, output_path, positi
     map_img.paste(template, position, template)
     map_img.save(output_path, 'PNG', quality=100, optimize=False)
 
-# 9. Save Map as HTML for Sharing
 def save_interactive_map(map_object, html_output_path, preview_image_name="map_preview.png", 
-                         github_repo_url="https://raw.githubusercontent.com/handry6/ConvectiveOutlookNew/main"):
+                         github_repo_url="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main"):
     map_object.save(html_output_path)
     with open(html_output_path, 'r', encoding='utf-8') as f:
         html_content = f.read()
     
-    og_tags = f'''
+    meta_tags = f'''
     <meta property="og:title" content="Handry Outlook Convective Outlook">
     <meta property="og:description" content="Interactive map showing thunderstorms risks across the UK.">
     <meta property="og:image" content="{github_repo_url}/{preview_image_name}">
-    <meta property="og:url" content="https://handry6.github.io/ConvectiveOutlookNew/{html_output_path}">
+    <meta property="og:url" content="https://Handry-Outlook.github.io/Convective-Outlook/{html_output_path}">
     <meta property="og:type" content="website">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }}
+        #map_{map_object.get_name()} {{
+            width: 100%;
+            height: 100%;
+        }}
+    </style>
     '''
-    updated_html = html_content.replace('<head>', f'<head>\n{og_tags}')
+    updated_html = html_content.replace('<head>', f'<head>\n{meta_tags}')
     
     with open(html_output_path, 'w', encoding='utf-8') as f:
         f.write(updated_html)
-    print(f"Interactive map saved as {html_output_path} with Open Graph tags")
+    print(f"Interactive map saved as {html_output_path} with Open Graph, viewport, and CSS")
     return html_output_path
 
-# Main execution
-if __name__ == "__main__":
+def run_processing(root, status_label):
+    status_label.config(text="Loading... Please wait.")
+    root.update_idletasks()  # Update UI to show loading message
+
     template_img = "2024 convective outlook FINALISED 2.png"
     mapbox_access_token = "pk.eyJ1IjoiaGFuZHJ5LW91dGxvb2siLCJhIjoiY2xrbnNrbmVlMXo0NDNqa2d3MTY2NW90bCJ9.AJbccNwtKvKA8il3JkE3PA"
     uk_bounds = {'min_lat': 47.6, 'max_lat': 62.1, 'min_lon': -13.7, 'max_lon': 7.4}
@@ -494,28 +860,30 @@ if __name__ == "__main__":
 
     print(f"Scanning UK Weather directory and subdirectories ({uk_weather_dir}) for 2022-2025:")
     all_files = []
-    for root, dirs, files in os.walk(uk_weather_dir):
-        rel_root = os.path.relpath(root, uk_weather_dir)
+    for root_dir, dirs, files in os.walk(uk_weather_dir):
+        rel_root = os.path.relpath(root_dir, uk_weather_dir)
         if rel_root == '.' or re.match(r'202[2-5](?:\\.*)?$', rel_root):
             for f in files:
-                full_path = os.path.join(root, f)
+                full_path = os.path.join(root_dir, f)
                 rel_path = os.path.relpath(full_path, uk_weather_dir)
                 all_files.append(rel_path)
                 print(f" - {rel_path}")
 
     kml_files = []
-    for root, _, files in os.walk(uk_weather_dir):
-        rel_root = os.path.relpath(root, uk_weather_dir)
+    for root_dir, _, files in os.walk(uk_weather_dir):
+        rel_root = os.path.relpath(root_dir, uk_weather_dir)
         if rel_root == '.' or re.match(r'202[2-5](?:\\.*)?$', rel_root):
             for f in files:
                 if re.match(r"Convective Outlook(?: UPDAT(?:E|ED)(\d+)?)? \d{8} \d{4} - \d{8} \d{4}(?:\s*\(\d+\))?\.kml", f, flags=re.IGNORECASE):
-                    kml_files.append(os.path.join(root, f))
+                    kml_files.append(os.path.join(root_dir, f))
 
     if not kml_files:
         print("No KML files found matching the pattern in UK Weather/202[2-5] directories!")
-        exit(1)
+        messagebox.showerror("Error", "No KML files found!")
+        status_label.config(text="Error: No KML files found.")
+        return
 
-    generate_discussion_template(kml_files, discussion_file)
+    generate_discussion_template(kml_files, discussion_file, root)
     discussions = load_discussions(discussion_file) if os.path.exists(discussion_file) else {}
 
     all_kmls_data_raw = {}
@@ -528,6 +896,10 @@ if __name__ == "__main__":
             all_kmls_data_raw[kml] = (start, end, cleaned_data, version)
 
     all_kmls_data = {kml: all_kmls_data_raw[kml] for kml in all_kmls_data_raw}
+
+    monthly_data, yearly_data = analyze_outlook_data(all_kmls_data)
+    create_monthly_chart_html(monthly_data, "monthly_charts.html")
+    create_yearly_chart_html(yearly_data, "yearly_charts.html")
 
     print("Detected Convective Outlooks (KML files):")
     date_version_counts = defaultdict(int)
@@ -544,22 +916,46 @@ if __name__ == "__main__":
     save_interactive_map(map_obj, interactive_map_html, preview_image_name=preview_image)
 
     repo_dir = os.path.dirname(os.path.abspath(__file__))
-    github_url = f"https://handry6.github.io/ConvectiveOutlookNew/{interactive_map_html}"
+    github_url = f"https://Handry-Outlook.github.io/Convective-Outlook/{interactive_map_html}"
     try:
         os.chdir(repo_dir)
         subprocess.run(["git", "add", interactive_map_html], check=True)
         subprocess.run(["git", "add", final_output], check=True)
         subprocess.run(["git", "add", preview_image], check=True)
-        subprocess.run(["git", "commit", "-m", "Update interactive map with preview image"], check=True)
+        subprocess.run(["git", "add", "monthly_charts.html"], check=True)
+        subprocess.run(["git", "add", "yearly_charts.html"], check=True)
+        subprocess.run(["git", "commit", "-m", "Update interactive map with charts and preview image"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
-        print("Interactive map and preview image successfully pushed to GitHub!")
+        print("Interactive map, charts, and preview image successfully pushed to GitHub!")
         webbrowser.open(github_url)
+        status_label.config(text="Processing complete! Map and charts uploaded.")
     except subprocess.CalledProcessError as e:
         print(f"Git operation failed: {e}")
         print("Ensure Git is set up correctly and your PAT is valid.")
         print(f"URL not opened: {github_url}")
+        status_label.config(text="Git operation failed. Check console.")
     except Exception as e:
         print(f"Failed to open browser: {e}")
         print(f"URL not opened: {github_url}")
+        status_label.config(text="Error occurred. Check console.")
 
     print(f"Final image saved as {final_output}")
+
+def main():
+    root = tk.Tk()
+    root.title("Convective Outlook Processor")
+    root.geometry("300x150")
+    
+    label = ttk.Label(root, text="Click 'Run' to process new convective outlooks.")
+    label.pack(pady=10)
+    
+    status_label = ttk.Label(root, text="")
+    status_label.pack(pady=5)
+    
+    run_btn = ttk.Button(root, text="Run", command=lambda: run_processing(root, status_label))
+    run_btn.pack(pady=10)
+    
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
