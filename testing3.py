@@ -190,7 +190,8 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         zoom_start=7,
         max_bounds=[[uk_min_lat, uk_min_lon], [uk_max_lat, uk_max_lon]],
         tiles="https://api.mapbox.com/styles/v1/handry-outlook/cm6dn4z49008801s2f3qd29he/draft/tiles/{z}/{x}/{y}?access_token=" + mapbox_access_token,
-        attr='Mapbox'
+        attr='Mapbox',
+        zoom_control=False
     )
     risk_colors = {
         'Low risk': '#5aac91',
@@ -623,7 +624,12 @@ def analyze_outlook_data(all_kmls_data):
     yearly_json = {year: dict(risks) for year, risks in yearly_data.items()}
     
     return monthly_json, yearly_json
+
 def create_monthly_chart_html(monthly_data, output_path):
+    # Icon image URL (assuming it's in the repository root)
+    github_repo_url = "https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main"
+    icon_image_url = f"{github_repo_url}/Handry_outlook_icon_pride_small.png"
+    
     html_content = f'''
     <!DOCTYPE html>
     <html lang="en">
@@ -642,6 +648,7 @@ def create_monthly_chart_html(monthly_data, output_path):
                 align-items: center;
                 min-height: 100vh;
                 overflow-x: hidden;
+                position: relative; /* For positioning the icon */
             }}
             h1 {{
                 font-size: 1.5em;
@@ -653,6 +660,15 @@ def create_monthly_chart_html(monthly_data, output_path):
                 max-width: 90vw;
                 height: 70vh !important;
             }}
+            /* Style for the icon */
+            .handry-icon {{
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                max-width: 50px; /* Reasonable size for desktop */
+                height: auto;
+                z-index: 10000; /* Ensure it’s above other elements */
+            }}
             @media (max-width: 600px) {{
                 h1 {{
                     font-size: 1.2em;
@@ -661,11 +677,17 @@ def create_monthly_chart_html(monthly_data, output_path):
                     max-width: 95vw;
                     height: 70vh !important;
                 }}
+                .handry-icon {{
+                    max-width: 30px; /* Smaller size for mobile */
+                    top: 5px;
+                    right: 5px;
+                }}
             }}
         </style>
     </head>
     <body>
         <h1>Monthly Convective Outlook Counts</h1>
+        <img src="{icon_image_url}" alt="Handry Outlook Icon" class="handry-icon">
         <canvas id="monthlyChart"></canvas>
         <script>
             const monthlyData = {json.dumps(monthly_data)};
@@ -705,6 +727,10 @@ def create_monthly_chart_html(monthly_data, output_path):
     print(f"Monthly chart HTML saved as {output_path}")
 
 def create_yearly_chart_html(yearly_data, output_path):
+    # Icon image URL (assuming it's in the repository root)
+    github_repo_url = "https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main"
+    icon_image_url = f"{github_repo_url}/Handry_outlook_icon_pride_small.png"
+    
     html_content = f'''
     <!DOCTYPE html>
     <html lang="en">
@@ -723,6 +749,7 @@ def create_yearly_chart_html(yearly_data, output_path):
                 align-items: center;
                 min-height: 100vh;
                 overflow-x: hidden;
+                position: relative; /* For positioning the icon */
             }}
             h1 {{
                 font-size: 1.5em;
@@ -734,6 +761,15 @@ def create_yearly_chart_html(yearly_data, output_path):
                 max-width: 90vw;
                 height: 70vh !important;
             }}
+            /* Style for the icon */
+            .handry-icon {{
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                max-width: 50px; /* Reasonable size for desktop */
+                height: auto;
+                z-index: 10000; /* Ensure it’s above other elements */
+            }}
             @media (max-width: 600px) {{
                 h1 {{
                     font-size: 1.2em;
@@ -742,11 +778,17 @@ def create_yearly_chart_html(yearly_data, output_path):
                     max-width: 95vw;
                     height: 70vh !important;
                 }}
+                .handry-icon {{
+                    max-width: 30px; /* Smaller size for mobile */
+                    top: 5px;
+                    right: 5px;
+                }}
             }}
         </style>
     </head>
     <body>
         <h1>Yearly Convective Outlook Counts</h1>
+        <img src="{icon_image_url}" alt="Handry Outlook Icon" class="handry-icon">
         <canvas id="yearlyChart"></canvas>
         <script>
             const yearlyData = {json.dumps(yearly_data)};
@@ -784,6 +826,7 @@ def create_yearly_chart_html(yearly_data, output_path):
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
     print(f"Yearly chart HTML saved as {output_path}")
+    
 # 7. Export Map as Image using Selenium
 def export_map_image(map_object, output_path, width=1360, height=1760):
     map_object.save("temp_map.html")
@@ -805,15 +848,25 @@ def overlay_on_template(map_image_path, template_image_path, output_path, positi
     map_img.save(output_path, 'PNG', quality=100, optimize=False)
 
 def save_interactive_map(map_object, html_output_path, preview_image_name="map_preview.png", 
-                         github_repo_url="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main"):
+                        github_repo_url="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main"):
     map_object.save(html_output_path)
     with open(html_output_path, 'r', encoding='utf-8') as f:
         html_content = f.read()
     
+    # Ensure the preview image is in the repository's root or a subfolder
+    preview_image_path = os.path.join(os.path.dirname(html_output_path), preview_image_name)
+    
+    # Construct the OG image URL using the raw GitHub content URL
+    # Use raw.githubusercontent.com for direct file access
+    og_image_url = f"{github_repo_url}/{preview_image_name}"
+    
+    # Icon image URL (assuming it's in the repository root)
+    icon_image_url = f"{github_repo_url}/Handry_outlook_icon_pride_small.png"
+    
     meta_tags = f'''
-    <meta property="og:title" content="Handry Outlook Convective Outlook">
+    <meta property="og:title" content="Handry Outlook's Convective Outlooks">
     <meta property="og:description" content="Interactive map showing thunderstorms risks across the UK.">
-    <meta property="og:image" content="{github_repo_url}/{preview_image_name}">
+    <meta property="og:image" content="{og_image_url}">
     <meta property="og:url" content="https://Handry-Outlook.github.io/Convective-Outlook/{html_output_path}">
     <meta property="og:type" content="website">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -827,17 +880,56 @@ def save_interactive_map(map_object, html_output_path, preview_image_name="map_p
             display: flex;
             justify-content: center;
             align-items: center;
+            position: relative; /* For positioning the icon */
         }}
         #map_{map_object.get_name()} {{
             width: 100%;
             height: 100%;
         }}
+        /* Style for the icon */
+        .handry-icon {{
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            max-width: 150px; /* Reasonable size for desktop */
+            height: auto;
+            z-index: 10000; /* Ensure it’s above other elements */
+        }}
+        @media (max-width: 600px) {{
+            .handry-icon {{
+                max-width: 30px; /* Smaller size for mobile */
+                top: 5px;
+                right: 5px;
+            }}
+        }}
+        /* Hide Mapbox zoom controls */
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in,
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{
+            display: none !important;
+        }}
     </style>
     '''
-    updated_html = html_content.replace('<head>', f'<head>\n{meta_tags}')
+    # Add the icon image to the body
+    icon_html = f'<img src="{icon_image_url}" alt="Handry Outlook Icon" class="handry-icon">'
+    updated_html = html_content.replace('<body>', f'<body>\n{icon_html}')
+    updated_html = updated_html.replace('<head>', f'<head>\n{meta_tags}')
     
     with open(html_output_path, 'w', encoding='utf-8') as f:
         f.write(updated_html)
+    
+    # Verify the preview image exists and is committed to GitHub
+    if not os.path.exists(preview_image_path):
+        print(f"Warning: Preview image '{preview_image_path}' does not exist locally. Ensure it’s generated and committed.")
+    else:
+        print(f"Preview image found at {preview_image_path}")
+    
+    # Verify the icon image exists
+    icon_local_path = os.path.join(os.path.dirname(html_output_path), "Handry_outlook_icon_pride_small.png")
+    if not os.path.exists(icon_local_path):
+        print(f"Warning: Icon image '{icon_local_path}' does not exist locally. Ensure it’s in the repository and committed.")
+    else:
+        print(f"Icon image found at {icon_local_path}")
+    
     print(f"Interactive map saved as {html_output_path} with Open Graph, viewport, and CSS")
     return html_output_path
 
