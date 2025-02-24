@@ -9,20 +9,23 @@
         <style>
             body {
                 font-family: Arial, sans-serif;
-                margin: 10px;
+                margin: 0;
+                padding: 10px;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
+                min-height: 100vh;
                 overflow-x: hidden;
             }
             h1 {
                 font-size: 1.5em;
                 margin-bottom: 10px;
+                text-align: center;
             }
             canvas {
                 width: 100% !important;
                 max-width: 90vw;
-                height: auto !important;
+                height: 70vh !important; /* Fixed height at 70% of viewport */
             }
             @media (max-width: 600px) {
                 h1 {
@@ -30,6 +33,7 @@
                 }
                 canvas {
                     max-width: 95vw;
+                    height: 70vh !important; /* Maintain 70% height on mobile */
                 }
             }
         </style>
@@ -77,10 +81,10 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false, /* Allow fixed height */
                     scales: {
                         x: {
-                            stacked: true, // Stack bars on mobile for space
+                            stacked: true,
                             title: { display: true, text: 'Year', font: { size: 14 } },
                             ticks: { font: { size: 12 } }
                         },
@@ -97,7 +101,7 @@
                             labels: {
                                 font: { size: 12 },
                                 padding: 10,
-                                boxWidth: 20 // Larger tap area
+                                boxWidth: 20
                             }
                         },
                         title: {
