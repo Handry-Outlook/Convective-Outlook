@@ -42,7 +42,7 @@
         <h1>Yearly Convective Outlook Counts</h1>
         <canvas id="yearlyChart"></canvas>
         <script>
-            const yearlyData = {"2023": {"Low risk": 76, "Slight risk": 70, "Enhanced risk": 20, "High risk": 6}, "2024": {"Low risk": 41, "Slight risk": 40, "Enhanced risk": 21, "High risk": 5, "Moderate risk": 11}, "2025": {"Low risk": 5, "Enhanced risk": 2, "Slight risk": 5}};
+            const yearlyData = {"2023": {"Slight risk": 70, "Low risk": 76, "Enhanced risk": 20, "High risk": 6}, "2024": {"Slight risk": 40, "Low risk": 41, "Enhanced risk": 21, "Moderate risk": 11, "High risk": 5}, "2025": {"Slight risk": 5, "Low risk": 5, "Enhanced risk": 2}};
             const labels = Object.keys(yearlyData).sort();
             const datasets = [
                 { label: 'Low risk', data: labels.map(year => yearlyData[year]['Low risk'] || 0), backgroundColor: '#5aac91' },
@@ -58,7 +58,7 @@
                 data: { labels: labels, datasets: datasets },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
+                    maintainAspectRatio: true,
                     scales: {
                         x: { stacked: false, title: { display: true, text: 'Year', font: { size: 14 } }, ticks: { font: { size: 12 } } },
                         y: { stacked: false, title: { display: true, text: 'Number of Days', font: { size: 14 } }, ticks: { font: { size: 12 } }, beginAtZero: true }
