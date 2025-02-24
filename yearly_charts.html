@@ -1,0 +1,78 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Yearly Convective Outlook Charts</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            canvas {
+                max-width: 800px;
+                width: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Yearly Convective Outlook Counts</h1>
+        <canvas id="yearlyChart"></canvas>
+        <script>
+            const yearlyData = {"2023": {"Low risk": 201, "Slight risk": 234, "Enhanced risk": 80, "High risk": 15}, "2024": {"Low risk": 57, "Slight risk": 87, "Enhanced risk": 35, "Moderate risk": 15, "High risk": 6}, "2025": {"Low risk": 6, "Slight risk": 8, "Enhanced risk": 2}};
+            const labels = Object.keys(yearlyData).sort();
+            const datasets = [
+                {
+                    label: 'Low risk',
+                    data: labels.map(year => yearlyData[year]['Low risk'] || 0),
+                    backgroundColor: '#5aac91',
+                },
+                {
+                    label: 'Slight risk',
+                    data: labels.map(year => yearlyData[year]['Slight risk'] || 0),
+                    backgroundColor: 'yellow',
+                },
+                {
+                    label: 'Enhanced risk',
+                    data: labels.map(year => yearlyData[year]['Enhanced risk'] || 0),
+                    backgroundColor: 'orange',
+                },
+                {
+                    label: 'Moderate risk',
+                    data: labels.map(year => yearlyData[year]['Moderate risk'] || 0),
+                    backgroundColor: 'red',
+                },
+                {
+                    label: 'High risk',
+                    data: labels.map(year => yearlyData[year]['High risk'] || 0),
+                    backgroundColor: 'purple',
+                }
+            ];
+
+            const ctx = document.getElementById('yearlyChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    scales: {
+                        x: { stacked: false, title: { display: true, text: 'Year' } },
+                        y: { stacked: false, title: { display: true, text: 'Number of Days' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: 'Yearly Convective Outlooks by Risk Level' }
+                    }
+                }
+            });
+        </script>
+    </body>
+    </html>
+    
