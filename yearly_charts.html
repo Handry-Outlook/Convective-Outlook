@@ -58,7 +58,7 @@
         <img src="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png" alt="Handry Outlook Icon" class="handry-icon">
         <canvas id="yearlyChart"></canvas>
         <script>
-            const yearlyData = {"2023": {"Low risk": 76, "Slight risk": 70, "Enhanced risk": 20, "High risk": 6}, "2024": {"Low risk": 41, "Slight risk": 40, "Enhanced risk": 21, "Moderate risk": 11, "High risk": 5}, "2025": {"Low risk": 4, "Enhanced risk": 1, "Slight risk": 4}};
+            const yearlyData = {"2022": {"Low risk": 1, "Slight risk": 1}, "2023": {"Low risk": 76, "Slight risk": 70, "Enhanced risk": 20, "High risk": 6}, "2024": {"Low risk": 41, "Slight risk": 40, "Enhanced risk": 21, "Moderate risk": 11, "High risk": 5}, "2025": {"Low risk": 4, "Enhanced risk": 1, "Slight risk": 4}};
             const labels = Object.keys(yearlyData).sort();
             const datasets = [
                 { label: 'Low risk', data: labels.map(year => yearlyData[year]['Low risk'] || 0), backgroundColor: '#5aac91' },
