@@ -919,44 +919,130 @@ Convective discussion for Convective Outlook 01092024 0600 - 02092024 0559.kml (
 Add your discussion here.
 
 [Convective Outlook 06092024 0000 - 06092024 2359.kml]
-Convective discussion for Convective Outlook 06092024 0000 - 06092024 2359.kml (Valid from 06/09/2024 00:00 to 06/09/2024 23:59, Version 1):
-Add your discussion here.
+Convective discussion for 06/09/2024 00:00 to 06/09/2024 23:59, Version 1
+Issued at 07/09/2024 10:55
+
+Overnight, a plume of MUCAPE exceeding 1000 J/KG, and potentially reaching 1500-2000 J/KG, is expected to move along the cold front of a low-pressure system passing over southern and central England. This raises the risk of frequent lightning and severe thunderstorms. The cold front, located on the eastern side of the low pressure over western central southern England, will shift northward, spreading across southern England, the Midlands, and East Anglia before moving into the North Sea.
+
+
+A mesoscale convective system (MCS), or potentially two MCSs with isolated storms in between, could curve northwestward from France and Benelux into southern England, potentially lasting into the Midlands. The complex wind patterns around the low-pressure system could bring further storms to southern England in the morning, moving northeast, with the remains of the MCS heading southwest through the Midlands. Later in the day, additional storms could develop in the southeast (SE) with surface-based CAPE possibly exceeding 1500 J/KG, leading to isolated pulse storms or another MCS depending on deep-layer shear. This could move across the English Channel into SE England, with further surface-based storms possible in the Midlands where cloud breaks occur. The environment is expected to be moist and buoyant, allowing energy to build rapidly once cloud cover dissipates.
+
+
+There is significant model disagreement over the storm risk tonight. Some models predict an MCS will form over northern France and move toward southern central England, potentially weakening over the Channel, although frequent lightning may still occur if it survives the crossing. The system may transition to an elevated storm as it reaches 800+ J/KG of MUCAPE, although the post-boundary layer is likely to be saturated, which may limit lightning frequency.
+
+
+Further east, a larger MCS could develop over a pool of 1500+ J/KG of MUCAPE, with lightning potentially semi-frequent due to the high CAPE values, although saturation may limit its intensity. This system may push into Suffolk and move northwest, with isolated elevated storms forming over the SE, where 800+ J/KG of MUCAPE exists but with weaker forcing than in southern central England or the North Sea. These storms also present a risk of organized lightning and could strengthen the MCS as it pushes inland. There is potential for the two MCSs to merge if stronger forcing occurs, with the UKV model being the most likely to predict this scenario, though it has its limitations. The AROME model, meanwhile, suggests that an MCS could form over land in SE England, initially producing strong storms before expanding east and west into a full MCS, potentially impacting London and the Midlands by early morning.
+
+
+The MCS is expected to move northwest into the Midlands and potentially as far north as Yorkshire. Most models indicate the MCS will not weaken until mid to late morning, with heavy rainfall expected across much of England. Rainfall totals may exceed 50 mm in 24 hours in some areas, with extreme model runs suggesting over 80 mm in isolated locations, raising a significant risk of flooding. Model disagreement remains over where the heaviest rainfall and most frequent lightning will occur, but widespread heavy rain is likely due to large PWAT values and extensive stratiform rain within the MCS. The specific stratiform rain configuration will depend on wind flow patterns within the MCS, which may shift around the low-pressure system. Some models peak rainfall totals in East Anglia and the eastern Midlands, where low-level shear could enhance convective rainfall, even though stratiform rainfall may be slightly weaker. This may also increase lightning activity in these regions, but saturation and available energy will be key factors.
+
+
+Later in the morning, the MCS could slow down over the western Midlands and near the Welsh border, with a balance between convective and stratiform rain leading to heavy stratiform rainfall. This raises the risk of flash flooding, particularly in the eastern Midlands.
+
+Hail is another risk, particularly in the SE, where storms may develop lower in the atmosphere, with relatively weak low-level shear but abundant MUCAPE extending into higher levels. Low freezing levels advecting from France into the south as the cold front passes increase the chance of low-end severe hail, especially over the SE.
+
+
+During the afternoon, another round of storms is possible in the SE as a trough pushes up from northern France, bringing 1500+ J/KG of MUCAPE, largely surface-based. Enhanced forcing could lead to deep convection, with cloud tops reaching 20,000-25,000 feet. Despite high saturation levels, a drier zone trailing the trough could reduce saturation issues and support organized lightning and heavy rain. Strong lapse rates could also contribute to small or low-end severe hail. Model differences regarding moisture levels at different heights could affect the lightning risk, with the ECM model showing drying near the boundary layer, while the higher-resolution ICON-D2 model shows more moisture in the mid-levels before drying occurs higher up.
+
+
+Storms may also develop in the Midlands and Lincolnshire if cloud breaks occur, with SBCAPE values exceeding 1000 J/KG. Drier profiles compared to the previous night may enhance lightning activity, but cloud cover will be a critical factor in determining how much energy can build and how active storms will become.
+
+
+Thanks for @EagleEyeStorm for providing his excellent, in-depth convective discussion.
 
 [Convective Outlook 20092024 0600 - 20092024 2359.kml]
-Convective discussion for Convective Outlook 20092024 0600 - 20092024 2359.kml (Valid from 20/09/2024 06:00 to 20/09/2024 23:59, Version 1):
-Add your discussion here.
+Convective discussion for 20/09/2024 06:00 to 20/09/2024 23:59, Version 1
+Issued at 19/09/2024 21:50
+
+A shortwave associated with a cold air mass aloft will move westward into England and Wales on Friday. As the cold air at mid-levels interacts with the environment, the lapse rates will steepen throughout the day, leading to cooler temperatures aloft. At the same time, a warm and humid theta-E plume will be introduced at lower levels, creating an increasingly energized atmosphere. Convective Available Potential Energy (CAPE) is expected to build up, peaking at over 1000 J/kg across Central-Southern England and parts of the Midlands. Strong 0-3 km CAPE (around 250 J/kg) suggests that any thunderstorms that develop will be accompanied by frequent lightning.
+
+
+The upper trough across western Germany will shift westward overnight, possibly triggering elevated thunderstorms in the early morning over parts of East Anglia and the East Midlands. As these morning showers dissipate by early afternoon, convection will develop across southern England, especially along a convergence zone. High-resolution models indicate the main convergence zone will form along the southern coasts and the M4 corridor, driven by a combination of sea breezes and northeasterly winds.
+
+Due to the unsaturated profile, isolated cells are likely to pop up easily, leading to a risk of localized flooding from training storms. Strong low-level shear (20-30 knots) could support rotating updrafts, and combined with the convergence zone, there is a possibility of a supercell or even a tornado, particularly in areas under a moderate (MDT) risk. The steep lapse rates and strong CAPE will also allow hail to form, potentially reaching 2.5 cm in diameter. Strong gusts of wind (up to 55 mph) are possible, especially if a supercell forms. The main limiting factor is the lack of deep-layer shear, which could shorten the lifespan of the storms.
+
+
+Most high-resolution models predict a cluster of thunderstorms will form over Dorset, moving westward, and possibly northwestward if a right-splitting supercell develops, into Somerset and Devon by late afternoon, prompting the issuance of an MDT risk. Some models, like AROME and DMI, also suggest the potential for another supercell forming from Swindon to Chepstow, which could also become a right-splitting supercell due to strong low-level shear. While an MDT risk is being considered for this second cell, the lack of agreement between models has prevented its issuance.
+
+
 
 [Convective Outlook UPDATED 20092024 0600 - 20092024 2359.kml]
-Convective discussion for Convective Outlook UPDATED 20092024 0600 - 20092024 2359.kml (Valid from 20/09/2024 06:00 to 20/09/2024 23:59, Version 2):
-Add your discussion here.
+Convective discussion for 20/09/2024 06:00 to 20/09/2024 23:59, Version 2
+Issued at 20/09/2024 06:05
 
+A shortwave associated with a cold air mass aloft will move westward into England and Wales on Friday. As the cold air at mid-levels interacts with the environment, the lapse rates will steepen throughout the day, leading to cooler temperatures aloft. At the same time, a warm and humid theta-E plume will be introduced at lower levels, creating an increasingly energized atmosphere. Convective Available Potential Energy (CAPE) is expected to build up, peaking at over 1000 J/kg across Central-Southern England and parts of the Midlands. Strong 0-3 km CAPE (around 250 J/kg) suggests that any thunderstorms that develop will be accompanied by frequent lightning.
+
+
+The upper trough across western Germany will shift westward overnight, possibly triggering elevated thunderstorms in the early morning over parts of East Anglia and the East Midlands. As these morning showers dissipate by early afternoon, convection will develop across southern England, especially along a convergence zone. High-resolution models indicate the main convergence zone will form along the southern coasts and the M4 corridor, driven by a combination of sea breezes and northeasterly winds.
+
+
+Isolated cells are likely to develop easily due to the unsaturated profile, increasing the risk of localized flooding from training storms. Strong low-level shear (20-30 knots) could support rotating updrafts, and with the presence of a convergence zone, there is a possibility of supercells or even tornadoes, especially in areas under HIGH risk. Steep lapse rates and strong CAPE could also lead to hail formation, potentially up to 2.5 cm in diameter. Overnight, most high-resolution models have shifted toward a more severe scenario, indicating a severe thunderstorm, possibly a supercell, moving westward and intensifying during the mid to late afternoon. Areas in Hampshire, Wiltshire, and Somerset are most likely to be impacted by these severe thunderstorms or supercells. Localized rainfall could reach 20-40 mm within three hours, heightening the flood risk. Additionally, strong gusts (up to 55 mph) are expected within the storm. Further severe thunderstorms are expected to develop south of the main system, affecting Dorset and Devon during rush hour.
 [Convective Outlook 21092024 0000 - 21092024 2359.kml]
-Convective discussion for Convective Outlook 21092024 0000 - 21092024 2359.kml (Valid from 21/09/2024 00:00 to 21/09/2024 23:59, Version 1):
-Add your discussion here.
+Convective discussion for 21/09/2024 00:00 to 21/09/2024 23:59, Version 1
+Issued at 20/09/2024 22:05
+
+The cold air aloft that triggered severe thunderstorms across parts of France and England on Friday will allow a shallow low-pressure system to develop over the Bay of Biscay. Further moist and warm theta-E advection into England and Wales will increase instability on Saturday afternoon, leading to widespread showers, with potential for thunderstorms, some of which could be locally severe.
+
+An occluded front associated with the shallow low triggered scattered elevated thunderstorms over the English Channel on Friday night, with one storm west of the Channel Islands and the main one near Doudeville in northern France. Pockets of shallow CAPE (around 500 J/kg) should support some lightning activity from these elevated storms, though insufficient deep-level shear will limit their lifespan. However, a sea convergence zone may enhance wind shear, possibly leading to an increase in lightning activity as the storms move into Hampshire around 04z. An enhanced risk has been issued for parts of Wiltshire, Somerset, and Gloucestershire, where frequent lightning may occur within the elevated thunderstorms. Another area of elevated thunderstorms west of the Channel Islands is also expected to redevelop south of Cornwall, prompting another enhanced risk due to the threat of frequent lightning and, to a lesser extent, isolated tornadoes or waterspouts.
+
+These elevated thunderstorms are expected to weaken and move westward into Wales by early afternoon. As daytime heating intensifies, a surge in strong CAPE, potentially reaching 1500 J/kg, will create significant instability. Any lingering showers from the earlier elevated thunderstorms could redevelop into stronger thunderstorms as mid-level saturation decreases. The first thunderstorms of the afternoon are likely to initiate near St. Albans and Milton Keynes, expanding northeastward through the rest of the afternoon. A moderate risk has been issued for this region, as significant downpours may lead to localized flooding, and steep lapse rates could produce hail up to 2.5 cm in diameter within the strongest cells. There is a slight chance that some thunderstorms may take on supercellular characteristics if low-level shear is sufficient. Simultaneously, scattered thunderstorms will develop over Gloucestershire and move northwest into Wales throughout the afternoon, also carrying the potential for large hail and heavy downpours. There is a risk of tornadoes, waterspouts, or funnel clouds forming along the Bristol Channel, where low-level shear is moderate. Both thunderstorm areas will track northeastward into Wales and eventually weaken into rain by nighttime.
+
+Scattered elevated thunderstorms may develop over the Channel again on Saturday night along another occluded front, but the oversaturated profiles suggest the overall risk will be low.
+
 
 [Convective Outlook UPDATED 21092024 0000 - 21092024 2359.kml]
-Convective discussion for Convective Outlook UPDATED 21092024 0000 - 21092024 2359.kml (Valid from 21/09/2024 00:00 to 21/09/2024 23:59, Version 2):
-Add your discussion here.
+Convective discussion for 21/09/2024 00:00 to 21/09/2024 23:59, Version 2
+Issued at 21/09/2024 08:35
+
+The cold air aloft that triggered severe thunderstorms across parts of France and England on Friday will allow a shallow low-pressure system to develop over the Bay of Biscay. Further moist and warm theta-E advection into England and Wales will increase instability on Saturday afternoon, leading to widespread showers, with potential for thunderstorms, some of which could be locally severe.
+
+An occluded front associated with the shallow low triggered scattered elevated thunderstorms over the English Channel on Friday night, with one storm west of the Channel Islands and the main one near Doudeville in northern France. Pockets of shallow CAPE (around 500 J/kg) should support some lightning activity from these elevated storms, though insufficient deep-level shear will limit their lifespan. However, a sea convergence zone may enhance wind shear, possibly leading to an increase in lightning activity as the storms move into Hampshire around 04z. An enhanced risk has been issued for parts of Wiltshire, Somerset, and Gloucestershire, where frequent lightning may occur within the elevated thunderstorms. Another area of elevated thunderstorms west of the Channel Islands is also expected to redevelop south of Cornwall, prompting another enhanced risk due to the threat of frequent lightning and, to a lesser extent, isolated tornadoes or waterspouts.
+
+These elevated thunderstorms are expected to weaken and move westward into Wales by early afternoon. As daytime heating intensifies, a surge in strong CAPE, potentially reaching 1500 J/kg, will create significant instability. Any lingering showers from the earlier elevated thunderstorms could redevelop into stronger thunderstorms as mid-level saturation decreases. The first thunderstorms of the afternoon are likely to initiate north of Oxford, expanding northeastward through the rest of the afternoon. A moderate risk has been issued for this region, as significant downpours may lead to localized flooding, and steep lapse rates could produce hail up to 2.5 cm in diameter within the strongest cells. There is a slight chance that some thunderstorms may take on supercellular characteristics if low-level shear is sufficient. Simultaneously, scattered thunderstorms will develop over Gloucestershire and move northwest into Wales throughout the afternoon, also carrying the potential for large hail and heavy downpours. There is a risk of tornadoes, waterspouts, or funnel clouds forming along the Bristol Channel, where low-level shear is moderate. Both thunderstorm areas will track northeastward into Wales and eventually weaken into rain by nighttime.
+
+Scattered elevated thunderstorms may develop over the Channel again on Saturday night along another occluded front, but the oversaturated profiles suggest the overall risk will be low.
+
 
 [Convective Outlook 22092024 1200 - 23092024 0600.kml]
-Convective discussion for Convective Outlook 22092024 1200 - 23092024 0600.kml (Valid from 22/09/2024 12:00 to 23/09/2024 06:00, Version 1):
-Add your discussion here.
+Convective discussion for 22/09/2024 12:00 to 23/09/2024 06:00 Version 1:
+Issued at 22/09/2024 11:00
 
+A low-pressure system has developed over the English Channel, bringing bands of torrential downpours to parts of England and Wales. Localized flooding will be the primary concern today and tomorrow as thunderstorms and heavy rain continue to affect parts of the Midlands over the next 36 hours.
+
+
+An occluded front associated with this low pressure is moving northward, and the heavy downpours linked to it are weakening as they head further north in the afternoon, allowing clearer spells to emerge along the southern coasts in the coming hours. Diurnal heating is expected to intensify some of the remaining showers across southern England. According to the latest radar and satellite imagery, showers are already developing over Hampshire, moving NNW toward the Midlands. Due to a saturated atmosphere, lightning activity will remain limited through the early afternoon. However, mid-level saturation is forecasted to clear later in the day, meaning that as this area of showers moves north of the M4 (e.g., around Swindon and Reading), rapid convective development is anticipated. CAPE levels may exceed 100 J/kg in some areas, leading to the formation of active thunderstorms. However, due to insufficient deep-level shear, these storms are not expected to last long before merging back into prolonged rainfall. As a result, only a Level 3 (enhanced risk) warning has been issued.
+
+
+Further elevated thunderstorms are expected to develop as a shortwave linked to the low-pressure system emerges over the eastern English Channel, bringing heavy downpours and frequent lightning. A slight increase in deep-level shear means these storms could push further inland. Kent and Essex will likely experience the most lightning activity, but residual CAPE from earlier storms could lead to scattered thunderstorms further inland. Again, localized flooding remains a concern.
 [Convective Outlook 25092024 1800 - 26092024 1159.kml]
-Convective discussion for Convective Outlook 25092024 1800 - 26092024 1159.kml (Valid from 25/09/2024 18:00 to 26/09/2024 11:59, Version 1):
-Add your discussion here.
+Convective discussion for 25/09/2024 18:00 to 26/09/2024 11:59, Version 1
+Issued at 25/09/2024 17:30
+
+
+On Wednesday night and Thursday,  a shortwave associated with an area of low pressure is expected to bring frequent heavy showers across southern England and parts of Wales. The strong gusts and steep lapse rates create favourable conditions for small hail to form within the heaviest showers. Additionally, CAPE (Convective Available Potential Energy) of 600-1000 J/kg will be sufficient for (strong) thunderstorm development. These storms may become more frequent over parts of the Celtic Sea and Cornwall. Strong deep-level shear will also increase the lifespan of thunderstorms. Strong gusts could be embedded within these heavy convective showers, reaching up to 60 mph in places.
+
+Isolated waterspouts/tornadoes are also possible.
 
 [Convective Outlook 08102024 0600 - 09102024 0559.kml]
-Convective discussion for Convective Outlook 08102024 0600 - 09102024 0559.kml (Valid from 08/10/2024 06:00 to 09/10/2024 05:59, Version 1):
-Add your discussion here.
+Convective discussion 08/10/2024 06:00 to 09/10/2024 05:59, Version 1
+Issued at 07/10/2024 21:35
+
+Overnight Monday into Tuesday, multiple occluded fronts and troughs may lead to widespread showers, particularly along the south coast and eastern areas. A low-pressure system across the Celtic Sea will pull in moisture, resulting in heavy rain and the potential for flooding, gusty wind and hail. There's also a small chance of funnel clouds or weak tornadoes due to the strong shearing.
+
+Much of southern and central England could see several rounds of showers, with sufficient instability (over 1000 J/KG of MUCAPE) for thunderstorm development. Most frequent lightning is expected across the enhanced risk during the late afternoon, as the occluded fronts will interact with the sufficient MUCAPE. While there may be some lightning, strong saturation could limit its intensity. 
 
 [Convective Outlook 23012025 0600 - 24012025 0559.kml]
-Convective discussion for Convective Outlook 23012025 0600 - 24012025 0559.kml (Valid from 23/01/2025 06:00 to 24/01/2025 05:59, Version 1):
-Add your discussion here.
+Convective discussion 23/01/2025 06:00 to 24/01/2025 05:59, Version 1
+Issued at 22/01/2025 22:05
+
+A complex frontal system will allow milder air mass to push in from the southwest, allowing some convective showers to develop, potentially bringing some scattered thunderstorms across SW England and Wales in the morning. Shallow CAPE with strong low and deep level shearing will provide an ideal environment for scattered thunderstorms to develop locally. This will often embedded with small hail and strong gusts.
+
+As the cold front advances eastward, strong shear will develop across southern England. Few high-resolution models suggest that one or two thundery cells will be long-lived, tracking from the Bristol channel into south of London. Given the extremely sheared environment, a tornado or two might develop alongside these cells.
 
 [Convective Outlook 26012025 0600 - 26012025 1800.kml]
 Convective discussion for 26/01/2025 06:00 to 26/01/2025 18:00, Version 1
 Issued at 26/01/2025 01:00
+
 A complex frontal system will allow milder air mass to push in from the southwest, allowing some convective showers to develop behind the band of rain associated with a warm front, potentially bringing some scattered thunderstorms across SW England and Wales in the late morning into early afternoon. Shallow CAPE with strong low and deep-level shearing will provide an ideal environment for scattered thunderstorms to develop locally. This will often embedded with strong gusts, potentially up to 80 mph locally. Isolated tornado/waterspout is also possible across the English Channel and SW England.
 
 
@@ -978,6 +1064,7 @@ During Monday, further thundery showers will develop along the channel, often em
 [Convective Outlook 20022025 0600 - 21022025 0559.kml]
 Convective discussion for 20/02/2025 06:00 to 21/02/2025 05:59, Version 1
 Issued at 19/02/2025 19:40
+
 A complex frontal system associated with a large Atlantic low-pressure system will bring bands of heavy showers across the British Isles from Wednesday night into early Thursday. An occluded front will transport a plume of milder southwesterly winds into many parts of the British Isles on Thursday, followed by modest CAPE values of 400-700 J/kg across the west. 
 
 Showers lingering behind the occluded front will likely turn thundery due to 200 J/kg of 3CAPE combined with moderate shear. The atmospheric profile behind the occluded front does not appear saturated, making it easier for thunderstorms to develop. Low-level shear of 35-45 knots and deep-layer shear of 40-60 knots could help sustain updrafts. If these thundery showers organize sufficiently, there is a chance that a bow echo could develop across central parts of ROI and Northern Ireland, potentially bringing locally damaging gusts, hail, and even one or two tornadoes along its 'tail'. 
@@ -989,15 +1076,12 @@ Another lower-confidence risk exists for a second round of thunderstorms across 
 
 
 
-[Convective Outlook 24022025 0600 - 25022025 0559.kml]
-Convective discussion for 24/02/2025 06:00 to 25/02/2025 05:59Version 1):
-Issued at 24/02/2025 19:40
-TESTING
-A complex frontal system associated with a large Atlantic low-pressure system will bring bands of heavy showers across the British Isles from Wednesday night into early Thursday. An occluded front will transport a plume of milder southwesterly winds into many parts of the British Isles on Thursday, followed by modest CAPE values of 400-700 J/kg across the west. 
 
-Showers lingering behind the occluded front will likely turn thundery due to 200 J/kg of 3CAPE combined with moderate shear. The atmospheric profile behind the occluded front does not appear saturated, making it easier for thunderstorms to develop. Low-level shear of 35-45 knots and deep-layer shear of 40-60 knots could help sustain updrafts. If these thundery showers organize sufficiently, there is a chance that a bow echo could develop across central parts of ROI and Northern Ireland, potentially bringing locally damaging gusts, hail, and even one or two tornadoes along its 'tail'. 
+[Convective Outlook UPDATED2 03062022 0600 - 04062022 0559.kml]
+Convective discussion for 03/06/2022 06:00 to 04/06/2022 05:59Version 3
+Issued at 03/06/2022 07:30
 
-Due to strong cross-model agreement on the likelihood of a bow echo, the first enhanced risk of the year has been issued, mainly highlighting the risk of severe thunderstorms between 07Z and 11Z. Due to strong shear, thunderstorms developing across Northern Ireland and ROI will continue moving northeastward into parts of Scotland during the late morning, maintaining a threat of large hail and tornadoes. 
-
-Another lower-confidence risk exists for a second round of thunderstorms across northern England. This will strongly depend on the available moisture remaining in the atmosphere after instability shifts into North Wales and northern England. Given forecasted PWAT values of 15-20 mm, one or two showers could develop and potentially intensify into thunderstorms. Shear will remain strong across the region, meaning there is still a continued tornado threat. If moisture levels are sufficient, one or more squall lines could develop, significantly increasing the chance of tornadoes between broken segments of showers. However, due to uncertainty, only a slight risk has been issued for this scenario.
+Some heavy showers with isolated thunderstorms will develop over Wales and Southwest England.
+The LOW-risk area is extended to the south as there is a very low risk of thunderstorms reaching the south coast on Saturday early morning.
+A SLIGHT risk area is added to parts of the south coast as there might be some thunderstorms reaching there overnight.
 

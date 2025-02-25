@@ -25,8 +25,8 @@ def load_kml(kml_file_path, discussions=None):
         gdf['discussion'] = discussions[kml_filename]
     else:
         gdf['discussion'] = "No discussion available."
-    print(f"KML DataFrame columns for {kml_file_path}:", gdf.columns)
-    print(f"First few rows of KML data for {kml_file_path}:", gdf.head())
+    #print(f"KML DataFrame columns for {kml_file_path}:", gdf.columns)  # Corrected from gmns to gdf.columns
+    #print(f"First few rows of KML data for {kml_file_path}:", gdf.head())
     return gdf
 
 # 2. Pre-process KML Data to Resolve Overlaps
@@ -49,7 +49,7 @@ def clean_kml_data(kml_data):
         if not current_geom.is_empty:
             new_row = gpd.GeoDataFrame([row.drop('geometry').to_dict() | {'geometry': current_geom}], crs=kml_data.crs)
             cleaned_gdf = pd.concat([cleaned_gdf, new_row], ignore_index=True)
-    print("Cleaned GeoDataFrame:", cleaned_gdf.head())
+    #print("Cleaned GeoDataFrame:", cleaned_gdf.head())
     return cleaned_gdf
 
 # 3. Parse Time Range from KML Filename (Fixed versioning)
@@ -62,15 +62,15 @@ def parse_kml_time(kml_file):
         end = datetime.strptime(f"{end_date} {end_time}", "%d%m%Y %H%M")
         if update_keyword is None:
             version = '1'
-            print(f"{kml_file}: No UPDATE keyword -> Version 1")
+            #print(f"{kml_file}: No UPDATE keyword -> Version 1")
         elif update_number is None:
             version = '2'
-            print(f"{kml_file}: UPDATE/UPDATED found, no number -> Version 2")
+            #print(f"{kml_file}: UPDATE/UPDATED found, no number -> Version 2")
         else:
             version = str(int(update_number) + 1)
-            print(f"{kml_file}: UPDATE{update_number} -> Version {version}")
+            #print(f"{kml_file}: UPDATE{update_number} -> Version {version}")
         return start, end, version
-    print(f"Filename {kml_file} did not match the expected pattern.")
+    #print(f"Filename {kml_file} did not match the expected pattern.")
     return None, None, None
 
 # 4. Load Discussions from Text File
@@ -94,7 +94,7 @@ def load_discussions(discussion_file_path):
         if current_kml and current_text:
             discussions[current_kml] = '\n'.join(current_text).strip()
     
-    print("Loaded discussions for:", list(discussions.keys()))
+    #print("Loaded discussions for:", list(discussions.keys()))
     return discussions
 
 
@@ -112,9 +112,9 @@ def generate_discussion_template(kml_files, discussion_file_path, root):
                     if match:
                         kml_name = match.group(1)
                         existing_discussions[kml_name] = section.strip()
-        print(f"Existing discussions found for: {list(existing_discussions.keys())}")
-    else:
-        print(f"Discussion file '{discussion_file_path}' does not exist. Creating new file.")
+        #print(f"Existing discussions found for: {list(existing_discussions.keys())}")
+    #else:
+        #print(f"Discussion file '{discussion_file_path}' does not exist. Creating new file.")
 
     new_kmls = []
     for kml_path in kml_files:
@@ -131,9 +131,10 @@ def generate_discussion_template(kml_files, discussion_file_path, root):
             f.write("# Format: [KML_FILENAME]\n"
                     "# Discussion text goes here (can span multiple lines)\n"
                     "# End with a blank line to separate entries\n\n")
-        print(f"Created empty discussion template file: {discussion_file_path}")
+        #print(f"Created empty discussion template file: {discussion_file_path}")
     else:
-        print(f"No new KMLs to add to '{discussion_file_path}'")
+        placeholder=0
+        #print(f"No new KMLs to add to '{discussion_file_path}'")
 
 def prompt_for_discussions(new_kmls, discussion_file_path, root):
     discussions = {}
@@ -171,13 +172,15 @@ def prompt_for_discussions(new_kmls, discussion_file_path, root):
                         "# Discussion text goes here (can span multiple lines)\n"
                         "# End with a blank line to separate entries\n\n")
             # Write discussions for only the new KMLs that have been entered
+            current_time = datetime.now().strftime('%d/%m/%Y %H:%M')
             for kml_filename, start, end, version in new_kmls:
                 if kml_filename in discussions:
                     f.write(f"[{kml_filename}]\n"
                             f"Convective discussion for {start.strftime('%d/%m/%Y %H:%M')} to {end.strftime('%d/%m/%Y %H:%M')}"
-                            f"Version {version}):\n"
-                            f"{discussions[kml_filename]}\n\n")
-        print(f"Appended {len(discussions)} new KML discussion entries to '{discussion_file_path}'")
+                            f"Version {version}\n"
+                            f"Issued at {current_time}\n"
+                            f"\n{discussions[kml_filename]}\n\n")
+        #print(f"Appended {len(discussions)} new KML discussion entries to '{discussion_file_path}'")
 
 # 6. Create Mapbox Map with Tooltips, Discussion, and Conditional Text Color
 def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_date):
@@ -234,30 +237,46 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     bounds = [[uk_min_lat, uk_min_lon], [uk_max_lat, uk_max_lon]]
     folium.FitBounds(bounds).add_to(m)
 
+    # Add Handry Outlook icon as an ImageOverlay
+    icon_url = "https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png"
+    # Define bounds for the icon in the top-right corner
+    # Adjust these bounds to position the icon (latitude/longitude coordinates)
+    icon_bounds = [[uk_max_lat, uk_min_lon], [uk_max_lat - 2, uk_min_lon + 4]]
+    icon_overlay = folium.raster_layers.ImageOverlay(
+        name="Handry Outlook Icon",
+        image=icon_url,
+        bounds=icon_bounds,
+        opacity=1.0,  # Fully opaque
+        interactive=True,
+        cross_origin=True,  # Allow cross-origin since it's a GitHub URL
+        zindex=10000,  # High z-index to ensure it’s on top
+    )
+    icon_overlay.add_to(m)
+    folium.Popup("Handry Outlook Icon").add_to(icon_overlay)  # Optional popup
+
+    # Add LayerControl to toggle layers (including the icon)
+    #folium.LayerControl().add_to(m)
+
+    # Rest of your existing code (risk_priority, calendar_html, legend_html, etc.) remains unchanged
     risk_priority = {'High risk': 2, 'Moderate risk': 3, 'Enhanced risk': 4, 'Slight risk': 5, 'Low risk': 6}
     risk_colors_cal = {'High risk': 'purple', 'Moderate risk': 'red', 'Enhanced risk': 'orange', 'Slight risk': 'yellow', 'Low risk': '#5aac91'}
-    date_risks = {}
+    date_risks = defaultdict(list)
     kml_times = {}
-
-    # Process KML data to pick the latest version per day and unique risks
     for kml, (kml_start, kml_end, kml_gdf, version) in all_kmls_data.items():
         layer_id = kml.split(os.sep)[-1].replace('.kml', '')
-        kml_times[layer_id] = f"Valid from {kml_start.strftime('%d/%m/%Y %H:%M')} to {kml_end.strftime('%d/%m/%Y %H:%M')}"
+        kml_times[layer_id] = f"Valid: {kml_start.strftime('%d/%m/%Y %H:%M')} to {kml_end.strftime('%d/%m/%Y %H:%M')}"
         current_date_iter = kml_start
         while current_date_iter <= kml_end:
             date_str = current_date_iter.strftime('%Y-%m-%d')
             version_num = int(version)
             base_date = kml_start.strftime('%d/%m/%Y')
             label = f"{base_date} Version {version_num}"
-            
-            # Only update if this is the first entry or a higher version
-            if date_str not in date_risks or version_num > date_risks[date_str][0][3]:
-                # Get unique risks (e.g., 3 "Slight risk" polygons count as 1 "Slight risk")
-                unique_risks = set(row['Name'] for _, row in kml_gdf.iterrows())
-                risks_for_day = [(risk, layer_id, label, version_num) for risk in unique_risks]
-                date_risks[date_str] = risks_for_day
+            unique_risks = set(row['Name'] for _, row in kml_gdf.iterrows())
+            risks_for_day = [(risk, layer_id, label, version_num) for risk in unique_risks]
+            date_risks[date_str].extend(risks_for_day)
             current_date_iter += timedelta(days=1)
 
+    date_risks = dict(date_risks)
     months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
     current_year = current_date.year
     years = list(range(current_year - 5, current_year + 6))
@@ -298,22 +317,31 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
 
     map_id = m.get_name()
     layer_groups_json = {k: v.get_name() for k, v in layer_groups.items()}
-
     legend_html = f'''
-    <!-- Collapsible legend in top-left corner, collapsed initially -->
-    <div id="legendBox" style="position: fixed; top: 1vh; left: 1vw; width: 20vw; min-width: 200px; max-width: 300px; background-color: white; border: 2px solid grey; z-index: 9999; font-size: 1em; padding: 0.5em; box-shadow: 2px 2px 6px rgba(0,0,0,0.3); box-sizing: border-box;">
-        <button id="toggleLegend" onclick="toggleLegend()" style="width: 100%; min-height: 50px; cursor: pointer; font-size: 1em; padding: 0.5em; box-sizing: border-box;">Detail and Archive</button>
-        <div id="legendContent" style="display: none;">
-            <b>Weather Risk Legend</b><br>
-            <i style="background: #5aac91; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Low risk<br>
-            <i style="background: yellow; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Slight risk<br>
-            <i style="background: orange; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Enhanced risk<br>
-            <i style="background: red; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Moderate risk<br>
-            <i style="background: purple; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> High risk<br>
-            <i style="background: black; width: 1em; height: 1em; float: left; margin-right: 0.5em;"></i> Other risks (flooding, hail, tornado, gusts)<br>
-            <br><b>Select Convective Outlook:</b><br>
-            <select id="kmlDropdown" onchange="showLayer(this.value);" style="width: 100%; padding: 0.3em; font-size: 0.9em;"></select>
-            <br><br>
+    <!-- Valid time in top-left corner -->
+    <div id="validTime" style="position: fixed; top: 1vh; left: 1vw; background-color: rgba(255, 255, 255, 0.8); padding: 0.5em 1em; border: 1px solid white; border-radius: 3px; z-index: 10001; font-size: 1.2em;">
+        {kml_times.get(default_layer_id, "No outlook has been issued for this day. Use risk calendar to see archive")}
+    </div>
+    <!-- Combined Legend Container -->
+    <div id="legendContainer" style="position: fixed; bottom: 1vh; left: 0; width: 100%; background-color: white; border: 2px solid grey; z-index: 10000; font-size: 1em; padding: 0.5em; box-shadow: 0 -2px 6px rgba(0,0,0,0.3); box-sizing: border-box;">
+        <!-- Weather Risk Legend (Always Visible) -->
+        <div id="legendBox" style="position: relative; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;">
+                    <div style="display: flex; align-items: center;"><i style="background: #5aac91; width: 1em; height: 1em; margin-right: 0.3em;"></i> Low risk</div>
+                    <div style="display: flex; align-items: center;"><i style="background: yellow; width: 1em; height: 1em; margin-right: 0.3em;"></i> Slight risk</div>
+                    <div style="display: flex; align-items: center;"><i style="background: orange; width: 1em; height: 1em; margin-right: 0.3em;"></i> Enhanced risk</div>
+                    <div style="display: flex; align-items: center;"><i style="background: red; width: 1em; height: 1em; margin-right: 0.3em;"></i> Moderate risk</div>
+                    <div style="display: flex; align-items: center;"><i style="background: purple; width: 1em; height: 1em; margin-right: 0.3em;"></i> High risk</div>
+                    <div style="display: flex; align-items: center;"><i style="background: black; width: 1em; height: 1em; margin-right: 0.3em;"></i> Risk of severe thunderstorms</div>
+                </div>
+            </div>
+            <select id="kmlDropdown" onchange="showLayer(this.value);" style="padding: 0.3em; font-size: 0.9em;"></select>
+            <button id="toggleLegend" onclick="toggleLegend()" style="min-height: 40px; cursor: pointer; font-size: 1em; padding: 0.3em 0.6em; box-sizing: border-box;">▲</button>
+        </div>
+        <!-- Expandable Content (Hidden by Default) -->
+        <div id="legendContent" style="display: none; margin-top: 0.5em; max-height: 70vh; overflow-y: auto;">
             <!-- Collapsible Convective Discussion -->
             <div style="margin-bottom: 0.5em;">
                 <button onclick="toggleSection('discussionSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Convective Discussion ►</button>
@@ -323,78 +351,83 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             </div>
             <!-- Collapsible Risk Calendar -->
             <div>
-                <button onclick="toggleSection('calendarSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Risk Calendar ▼</button>
-                <div id="calendarSection" style="display: block;">
+                <button onclick="toggleSection('calendarSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Risk Calendar ►</button>
+                <div id="calendarSection" style="display: none;">
                     <div style="display: flex; justify-content: space-between; width: 100%;">
                         <select id="monthDropdown" onchange="updateCalendar();" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{month_options}</select>
                         <select id="yearDropdown" onchange="updateCalendar();" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{year_options}</select>
                     </div>
                     <br>
                     <div id="calendarContainer" style="width: 100%;">{calendar_html}</div>
+                    <!-- Chart Buttons -->
+                    <div style="margin-top: 0.5em; display: flex; gap: 0.5em; flex-wrap: wrap; justify-content: center;">
+                        <button onclick="window.open('monthly_charts.html', '_blank')" style="padding: 0.3em; font-size: 0.9em; cursor: pointer;">Monthly Outlook Charts</button>
+                        <button onclick="window.open('yearly_charts.html', '_blank')" style="padding: 0.3em; font-size: 0.9em; cursor: pointer;">Yearly Outlook Charts</button>
+                    </div>
                 </div>
-            </div>
-            <!-- New Chart Buttons -->
-            <div style="margin-top: 0.5em;">
-                <button onclick="window.open('monthly_charts.html', '_blank')" style="width: 100%; padding: 0.3em; font-size: 0.9em; cursor: pointer;">Monthly Outlook Charts</button>
-                <button onclick="window.open('yearly_charts.html', '_blank')" style="width: 100%; padding: 0.3em; font-size: 0.9em; cursor: pointer; margin-top: 0.3em;">Yearly Outlook Charts</button>
             </div>
         </div>
     </div>
-    <!-- Valid time in bottom-left corner -->
-    <div id="validTime" style="position: fixed; bottom: 1vh; left: 1vw; background-color: rgba(255, 255, 255, 0.8); padding: 0.5em 1em; border: 1px solid white; border-radius: 3px; z-index: 9999; font-size: 1.2em;">
-        {kml_times.get(default_layer_id, "No outlook has been issued for this day. Use risk calendar to see archive")}
-    </div>
     <!-- Responsive styles -->
     <style>
-        #legendBox {{
-            height: 5vh; /* Initial collapsed height */
-            min-height: 65px; /* Minimum height to match button */
-            transition: height 0.3s ease; /* Smooth transition */
-            overflow: hidden; /* Hide content when collapsed */
+        body {{
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
         }}
-        #legendBox.expanded {{
-            height: auto; /* Expand to fit content */
-            max-height: 80vh; /* Cap at 80% of viewport height */
-            overflow-y: auto; /* Scroll if content exceeds max-height */
+        #legendContainer {{
+            transition: all 0.3s ease;
         }}
-        /* Hide Mapbox zoom controls */
-        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in,
-        .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{
-            display: none !important;
-        }}
-        @media (max-width: 600px) {{
-            #legendBox {{
-                width: 50vw;
-                min-width: 150px;
-                font-size: 0.8em;
-                height: 5vh; /* Consistent collapsed height on mobile */
-                min-height: 50px;
-            }}
-            #legendBox.expanded {{
-                width: 50vw;
-                height: auto; /* Expand to fit content */
-                max-height: 80vh; /* Maintain 80% max height */
-                overflow-y: auto;
-            }}
+        @media (max-width: 600px) {{ /* Mobile devices */
             #validTime {{
                 font-size: 0.9em;
                 padding: 0.3em 0.6em;
+            }}
+            #legendContainer {{
+                font-size: 0.8em;
+                padding: 0.3em;
+            }}
+            #legendBox {{
+                min-height: 40px;
+                gap: 5px;
+            }}
+            #legendBox select, #legendBox button {{
+                font-size: 0.8em;
+                padding: 0.2em 0.4em;
+            }}
+            #legendContent div, #legendContent button {{
+                font-size: 0.8em;
             }}
             #calendarTable th, #calendarTable td {{
                 font-size: 0.7em;
                 padding: 0.1em;
             }}
-            /* Adjust dropdowns on mobile */
-            #calendarSection div {{
-                display: flex;
-                flex-wrap: wrap;
-                gap: 4%;
-            }}
-            #monthDropdown, #yearDropdown {{
-                width: 48%;
+            .leaflet-overlay-pane img {{ /* Ensure icon is visible on mobile */
+                display: block !important;
             }}
         }}
+        @media (min-width: 601px) {{ /* Non-mobile devices (tablets, desktops) */
+            .leaflet-overlay-pane img {{ /* Hide icon on non-mobile */
+                display: none !important;
+            }}
+        }}
+        #map_{map_id} {{
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+        }}
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in,
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{
+            display: none !important;
+        }}
     </style>
+    <!-- Rest of the JavaScript remains unchanged -->
     <script>
     var layerGroups = {json.dumps(layer_groups_json, ensure_ascii=False)};
     var layerDefinitions = {json.dumps(layer_definitions, ensure_ascii=False)};
@@ -465,7 +498,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             document.getElementById('validTime').innerHTML = kmlTimes[layerId] || 'Valid time not available';
         }} else {{
             document.getElementById('discussionText').innerHTML = 'Select an outlook to view discussion.';
-            document.getElementById('validTime').innerHTML = 'No convective outlook is avalible for this day, please select another day';
+            document.getElementById('validTime').innerHTML = 'No convective outlook is available for this day, please select another day';
         }}
         document.getElementById('kmlDropdown').value = layerId;
     }}
@@ -565,18 +598,16 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     }}
 
     function toggleLegend() {{
+        console.log('Toggling legend');
         var content = document.getElementById('legendContent');
         var button = document.getElementById('toggleLegend');
-        var legendBox = document.getElementById('legendBox');
         if (content.style.display === 'none') {{
             content.style.display = 'block';
-            button.innerHTML = 'Hide';
-            legendBox.classList.add('expanded');
+            button.innerHTML = '▼';
             updateCalendar();
         }} else {{
             content.style.display = 'none';
-            button.innerHTML = 'Detail and Archive';
-            legendBox.classList.remove('expanded');
+            button.innerHTML = '▲';
         }}
     }}
 
@@ -590,8 +621,10 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     }});
     </script>
     '''
+    
     m.get_root().html.add_child(folium.Element(legend_html))
     return m
+  
 def analyze_outlook_data(all_kmls_data):
     monthly_data = defaultdict(lambda: defaultdict(int))
     yearly_data = defaultdict(lambda: defaultdict(int))
@@ -658,7 +691,7 @@ def create_monthly_chart_html(monthly_data, output_path):
             canvas {{
                 width: 100% !important;
                 max-width: 90vw;
-                height: 70vh !important;
+                height: 90vh !important;
             }}
             /* Style for the icon */
             .handry-icon {{
@@ -724,7 +757,7 @@ def create_monthly_chart_html(monthly_data, output_path):
     '''
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
-    print(f"Monthly chart HTML saved as {output_path}")
+    #print(f"Monthly chart HTML saved as {output_path}")
 
 def create_yearly_chart_html(yearly_data, output_path):
     # Icon image URL (assuming it's in the repository root)
@@ -759,7 +792,7 @@ def create_yearly_chart_html(yearly_data, output_path):
             canvas {{
                 width: 100% !important;
                 max-width: 90vw;
-                height: 70vh !important;
+                height: 100vh !important;
             }}
             /* Style for the icon */
             .handry-icon {{
@@ -825,7 +858,7 @@ def create_yearly_chart_html(yearly_data, output_path):
     '''
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
-    print(f"Yearly chart HTML saved as {output_path}")
+    #print(f"Yearly chart HTML saved as {output_path}")
     
 # 7. Export Map as Image using Selenium
 def export_map_image(map_object, output_path, width=1360, height=1760):
@@ -897,7 +930,7 @@ def save_interactive_map(map_object, html_output_path, preview_image_name="map_p
         }}
         @media (max-width: 600px) {{
             .handry-icon {{
-                max-width: 30px; /* Smaller size for mobile */
+                max-width: 0px; /* Smaller size for mobile */
                 top: 5px;
                 right: 5px;
             }}
@@ -918,19 +951,19 @@ def save_interactive_map(map_object, html_output_path, preview_image_name="map_p
         f.write(updated_html)
     
     # Verify the preview image exists and is committed to GitHub
-    if not os.path.exists(preview_image_path):
-        print(f"Warning: Preview image '{preview_image_path}' does not exist locally. Ensure it’s generated and committed.")
-    else:
-        print(f"Preview image found at {preview_image_path}")
+    #if not os.path.exists(preview_image_path):
+        #print(f"Warning: Preview image '{preview_image_path}' does not exist locally. Ensure it’s generated and committed.")
+    #else:
+        #print(f"Preview image found at {preview_image_path}")
     
     # Verify the icon image exists
     icon_local_path = os.path.join(os.path.dirname(html_output_path), "Handry_outlook_icon_pride_small.png")
-    if not os.path.exists(icon_local_path):
-        print(f"Warning: Icon image '{icon_local_path}' does not exist locally. Ensure it’s in the repository and committed.")
-    else:
-        print(f"Icon image found at {icon_local_path}")
+    #if not os.path.exists(icon_local_path):
+        #print(f"Warning: Icon image '{icon_local_path}' does not exist locally. Ensure it’s in the repository and committed.")
+    #else:
+        #print(f"Icon image found at {icon_local_path}")
     
-    print(f"Interactive map saved as {html_output_path} with Open Graph, viewport, and CSS")
+    #print(f"Interactive map saved as {html_output_path} with Open Graph, viewport, and CSS")
     return html_output_path
 
 def run_processing(root, status_label):
@@ -950,7 +983,7 @@ def run_processing(root, status_label):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     uk_weather_dir = os.path.dirname(script_dir)
 
-    print(f"Scanning UK Weather directory and subdirectories ({uk_weather_dir}) for 2022-2025:")
+    #print(f"Scanning UK Weather directory and subdirectories ({uk_weather_dir}) for 2022-2025:")
     all_files = []
     for root_dir, dirs, files in os.walk(uk_weather_dir):
         rel_root = os.path.relpath(root_dir, uk_weather_dir)
@@ -959,7 +992,7 @@ def run_processing(root, status_label):
                 full_path = os.path.join(root_dir, f)
                 rel_path = os.path.relpath(full_path, uk_weather_dir)
                 all_files.append(rel_path)
-                print(f" - {rel_path}")
+                #print(f" - {rel_path}")
 
     kml_files = []
     for root_dir, _, files in os.walk(uk_weather_dir):
@@ -970,7 +1003,7 @@ def run_processing(root, status_label):
                     kml_files.append(os.path.join(root_dir, f))
 
     if not kml_files:
-        print("No KML files found matching the pattern in UK Weather/202[2-5] directories!")
+        #print("No KML files found matching the pattern in UK Weather/202[2-5] directories!")
         messagebox.showerror("Error", "No KML files found!")
         status_label.config(text="Error: No KML files found.")
         return
@@ -993,14 +1026,14 @@ def run_processing(root, status_label):
     create_monthly_chart_html(monthly_data, "monthly_charts.html")
     create_yearly_chart_html(yearly_data, "yearly_charts.html")
 
-    print("Detected Convective Outlooks (KML files):")
+    #("Detected Convective Outlooks (KML files):")
     date_version_counts = defaultdict(int)
     for i, (kml, (start, end, data, version)) in enumerate(all_kmls_data.items(), 1):
         base_date = start.strftime('%d/%m/%Y')
         version_num = int(version)
         date_version_counts[base_date] = max(date_version_counts[base_date], version_num)
         version_label = f"{base_date} Version {version_num}"
-        print(f"{i}. {kml} -> {version_label}")
+        #print(f"{i}. {kml} -> {version_label}")
 
     map_obj = create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_date)
     export_map_image(map_obj, output_map_img)
@@ -1018,20 +1051,20 @@ def run_processing(root, status_label):
         subprocess.run(["git", "add", "yearly_charts.html"], check=True)
         subprocess.run(["git", "commit", "-m", "Update interactive map with charts and preview image"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
-        print("Interactive map, charts, and preview image successfully pushed to GitHub!")
+        #print("Interactive map, charts, and preview image successfully pushed to GitHub!")
         webbrowser.open(github_url)
         status_label.config(text="Processing complete! Map and charts uploaded.")
     except subprocess.CalledProcessError as e:
-        print(f"Git operation failed: {e}")
-        print("Ensure Git is set up correctly and your PAT is valid.")
-        print(f"URL not opened: {github_url}")
+        #print(f"Git operation failed: {e}")
+        #print("Ensure Git is set up correctly and your PAT is valid.")
+        #print(f"URL not opened: {github_url}")
         status_label.config(text="Git operation failed. Check console.")
     except Exception as e:
-        print(f"Failed to open browser: {e}")
-        print(f"URL not opened: {github_url}")
+        #print(f"Failed to open browser: {e}")
+        #print(f"URL not opened: {github_url}")
         status_label.config(text="Error occurred. Check console.")
 
-    print(f"Final image saved as {final_output}")
+    #print(f"Final image saved as {final_output}")
 
 def main():
     root = tk.Tk()
