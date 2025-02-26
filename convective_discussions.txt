@@ -1078,10 +1078,18 @@ Another lower-confidence risk exists for a second round of thunderstorms across 
 
 
 [Convective Outlook UPDATED2 03062022 0600 - 04062022 0559.kml]
-Convective discussion for 03/06/2022 06:00 to 04/06/2022 05:59Version 3
+Convective discussion for 03/06/2022 06:00 to 04/06/2022 05:59 Version 3
 Issued at 03/06/2022 07:30
 
 Some heavy showers with isolated thunderstorms will develop over Wales and Southwest England.
 The LOW-risk area is extended to the south as there is a very low risk of thunderstorms reaching the south coast on Saturday early morning.
 A SLIGHT risk area is added to parts of the south coast as there might be some thunderstorms reaching there overnight.
+
+[Convective Outlook 26022025 0000 - 26022025 2359.kml]
+Convective discussion for 26/02/2025 00:00 to 26/02/2025 23:59 Version 1
+Issued at 25/02/2025 21:55
+
+A frontal system associated with a low pressure will develop a band of heavy showers to many. Some of these showers could turn thundery, especially across the St.George's Channel and the Bristol Channel, and some of them might be able to make themselves into parts of west Wales during the early morning. Strong gusts could be embedded within these showers but most of them won't be severe.
+
+As the band of heavy showers clears eastward over the morning, surface convection will allow scattered showers to develop. Due to the time of the year, as surface heating is still rather weak, most of these showers will not turn thundery, but perhaps one or two cells could develop in the east and deliver a few lightning strikes across the low-risk.
 

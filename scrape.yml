@@ -1,0 +1,78 @@
+name: Scrape Lightning Strikes and Update Convective Outlook
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium matplotlib cartopy geopandas folium pandas pillow
+          sudo apt-get update
+          sudo apt-get install -y libgeos-dev
+      - name: Install Chrome and ChromeDriver
+        run: |
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          
+          CHROME_VERSION=$(google-chrome --version | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          echo "Chrome version: $CHROME_VERSION"
+          
+          sudo rm -f /usr/local/bin/chromedriver
+          
+          DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+          if echo "$DRIVER_VERSION" | grep -q "<Error>"; then
+            DRIVER_VERSION="133.0.6943.87"
+            echo "Attempting fallback to edgedl.me.gvt1.com for version $DRIVER_VERSION..."
+            wget -v "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$DRIVER_VERSION/linux64/chromedriver-linux64.zip" || {
+              DRIVER_VERSION="133.0.6943.106"
+              wget -v "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$DRIVER_VERSION/linux64/chromedriver-linux64.zip" || {
+                DRIVER_VERSION="114.0.5735.90"
+                wget -v "https://chromedriver.storage.googleapis.com/$DRIVER_VERSION/chromedriver_linux64.zip" || {
+                  echo "All download attempts failed."
+                  exit 1
+                }
+              }
+            }
+          else
+            echo "Using ChromeDriver version from primary source: $DRIVER_VERSION"
+            wget -v "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip" || { echo "Failed to download ChromeDriver"; exit 1; }
+          fi
+          
+          unzip chromedriver-linux64.zip
+          if [ -f chromedriver-linux64/chromedriver ]; then
+            sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+          else
+            sudo mv chromedriver /usr/local/bin/
+          fi
+          sudo chmod +x /usr/local/bin/chromedriver
+          
+          INSTALLED_DRIVER_VERSION=$(chromedriver --version | grep -oE "[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+")
+          echo "Installed ChromeDriver version: $INSTALLED_DRIVER_VERSION"
+          if ! echo "$INSTALLED_DRIVER_VERSION" | grep -q "^${CHROME_VERSION}"; then
+            echo "Warning: ChromeDriver version ($INSTALLED_DRIVER_VERSION) does not match Chrome version ($CHROME_VERSION). Proceeding anyway."
+          fi
+      - name: Run scraping and mapping script
+        run: python convective_outlook_with_lightning.py
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add strikes.json interactive_map.html final_output.png map_preview.png monthly_charts.html yearly_charts.html
+          git commit -m "Update convective outlook and strikes" || echo "No changes to commit"
+          git push
