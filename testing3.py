@@ -3,6 +3,8 @@ import folium
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from PIL import Image
 import time
 import os
 import subprocess
@@ -10,96 +12,34 @@ from datetime import datetime, timedelta
 import re
 import json
 import webbrowser
+import requests
 from collections import defaultdict
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
-from PIL import Image
 
-# Scrape strikes function
-def scrape_strikes():
-    options = Options()
-    options.add_argument("--headless")
-    driver = webdriver.Chrome(options=options)
-    
-    url = "https://map.blitzortung.org/"
-    driver.get(url)
-    print(f"[{datetime.now()}] Loading map, waiting for strikes...")
-    time.sleep(30)
-    
-    script = """
-        var strikes = [];
-        try {
-            if (typeof window.Strikes !== 'undefined') {
-                strikes = window.Strikes;
-            } else if (typeof map !== 'undefined') {
-                if (typeof map.getStyle === 'function') {
-                    var sources = map.getStyle().sources;
-                    for (var key in sources) {
-                        if (sources[key].type === 'geojson' && sources[key].data) {
-                            strikes = sources[key].data.features || [];
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.log('Error:', e);
-        }
-        return JSON.stringify(strikes);
-    """
-    try:
-        strikes_data = driver.execute_script(script)
-        strikes = json.loads(strikes_data) if strikes_data else []
-        print(f"[{datetime.now()}] Scraped {len(strikes)} strikes")
-    except Exception as e:
-        print(f"[{datetime.now()}] Script error: {e}")
-        strikes = []
-    
-    driver.quit()
-    return strikes
 
-# Load and update strikes
-def update_strikes():
-    data_file = "strikes.json"
-    if os.path.exists(data_file):
-        with open(data_file, "r") as f:
-            all_strikes = json.load(f)
-    else:
-        all_strikes = []
-    
-    new_strikes = scrape_strikes()
-    now = datetime.now()
-    for strike in new_strikes:
-        try:
-            lon, lat = strike["geometry"]["coordinates"]
-            strike_data = {
-                "lat": lat,
-                "lon": lon,
-                "time": strike["properties"].get("time", now.isoformat())
-            }
-            if not any(s["lat"] == lat and s["lon"] == lon and s["time"] == strike_data["time"] for s in all_strikes):
-                all_strikes.append(strike_data)
-        except (KeyError, TypeError) as e:
-            print(f"[{datetime.now()}] Skipping malformed strike: {e}")
-    
-    with open(data_file, "w") as f:
-        json.dump(all_strikes, f)
-    print(f"[{datetime.now()}] Total strikes saved: {len(all_strikes)}")
-    return all_strikes
-
-# Load KML and related functions (unchanged from testing3.py)
+# 1. Load and Parse the KML File
 def load_kml(kml_file_path, discussions=None):
     gdf = gpd.read_file(kml_file_path)
-    gdf = gdf.to_crs(epsg=4326)
+    gdf = gdf.to_crs(epsg=4326)  # WGS84
     kml_filename = os.path.basename(kml_file_path)
     if discussions and kml_filename in discussions:
         gdf['discussion'] = discussions[kml_filename]
     else:
         gdf['discussion'] = "No discussion available."
+    #print(f"KML DataFrame columns for {kml_file_path}:", gdf.columns)  # Corrected from gmns to gdf.columns
+    #print(f"First few rows of KML data for {kml_file_path}:", gdf.head())
     return gdf
 
+# 2. Pre-process KML Data to Resolve Overlaps
 def clean_kml_data(kml_data):
-    risk_priority = {'Low risk': 6, 'Slight risk': 5, 'Enhanced risk': 4, 'Moderate risk': 3, 'High risk': 2}
+    risk_priority = {
+        'Low risk': 6,
+        'Slight risk': 5,
+        'Enhanced risk': 4,
+        'Moderate risk': 3,
+        'High risk': 2,
+    }
     kml_data['priority'] = kml_data['Name'].map(risk_priority).fillna(0)
     kml_data = kml_data.sort_values(by='priority', ascending=False)
     cleaned_gdf = gpd.GeoDataFrame(columns=kml_data.columns, crs=kml_data.crs)
@@ -111,8 +51,10 @@ def clean_kml_data(kml_data):
         if not current_geom.is_empty:
             new_row = gpd.GeoDataFrame([row.drop('geometry').to_dict() | {'geometry': current_geom}], crs=kml_data.crs)
             cleaned_gdf = pd.concat([cleaned_gdf, new_row], ignore_index=True)
+    #print("Cleaned GeoDataFrame:", cleaned_gdf.head())
     return cleaned_gdf
 
+# 3. Parse Time Range from KML Filename (Fixed versioning)
 def parse_kml_time(kml_file):
     pattern = r"Convective Outlook(?:\s*(UPDAT(?:E|ED))(\d+)?)? (\d{8}) (\d{4}) - (\d{8}) (\d{4})(?:\s*\(\d+\))?\.kml"
     match = re.search(pattern, kml_file, re.IGNORECASE)
@@ -120,14 +62,25 @@ def parse_kml_time(kml_file):
         update_keyword, update_number, start_date, start_time, end_date, end_time = match.groups()
         start = datetime.strptime(f"{start_date} {start_time}", "%d%m%Y %H%M")
         end = datetime.strptime(f"{end_date} {end_time}", "%d%m%Y %H%M")
-        version = '1' if update_keyword is None else '2' if update_number is None else str(int(update_number) + 1)
+        if update_keyword is None:
+            version = '1'
+            #print(f"{kml_file}: No UPDATE keyword -> Version 1")
+        elif update_number is None:
+            version = '2'
+            #print(f"{kml_file}: UPDATE/UPDATED found, no number -> Version 2")
+        else:
+            version = str(int(update_number) + 1)
+            #print(f"{kml_file}: UPDATE{update_number} -> Version {version}")
         return start, end, version
+    #print(f"Filename {kml_file} did not match the expected pattern.")
     return None, None, None
 
+# 4. Load Discussions from Text File
 def load_discussions(discussion_file_path):
     discussions = {}
     current_kml = None
     current_text = []
+    
     with open(discussion_file_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
@@ -142,8 +95,13 @@ def load_discussions(discussion_file_path):
                 current_text.append(line)
         if current_kml and current_text:
             discussions[current_kml] = '\n'.join(current_text).strip()
+    
+    #print("Loaded discussions for:", list(discussions.keys()))
     return discussions
 
+
+
+# 5. Generate Discussion Template File (Append new KMLs without overwriting)
 def generate_discussion_template(kml_files, discussion_file_path, root):
     existing_discussions = {}
     if os.path.exists(discussion_file_path):
@@ -156,7 +114,10 @@ def generate_discussion_template(kml_files, discussion_file_path, root):
                     if match:
                         kml_name = match.group(1)
                         existing_discussions[kml_name] = section.strip()
-    
+        #print(f"Existing discussions found for: {list(existing_discussions.keys())}")
+    #else:
+        #print(f"Discussion file '{discussion_file_path}' does not exist. Creating new file.")
+
     new_kmls = []
     for kml_path in kml_files:
         kml_filename = os.path.basename(kml_path)
@@ -169,10 +130,17 @@ def generate_discussion_template(kml_files, discussion_file_path, root):
         prompt_for_discussions(new_kmls, discussion_file_path, root)
     elif not existing_discussions:
         with open(discussion_file_path, 'w', encoding='utf-8') as f:
-            f.write("# Format: [KML_FILENAME]\n# Discussion text goes here (can span multiple lines)\n# End with a blank line to separate entries\n\n")
+            f.write("# Format: [KML_FILENAME]\n"
+                    "# Discussion text goes here (can span multiple lines)\n"
+                    "# End with a blank line to separate entries\n\n")
+        #print(f"Created empty discussion template file: {discussion_file_path}")
+    else:
+        placeholder=0
+        #print(f"No new KMLs to add to '{discussion_file_path}'")
 
 def prompt_for_discussions(new_kmls, discussion_file_path, root):
     discussions = {}
+    
     def submit_discussion(kml_filename, entry, window):
         discussion_text = entry.get("1.0", tk.END).strip()
         if discussion_text:
@@ -180,7 +148,7 @@ def prompt_for_discussions(new_kmls, discussion_file_path, root):
             window.destroy()
         else:
             messagebox.showwarning("Empty Discussion", "Please enter a discussion before submitting.")
-    
+
     for kml_filename, start, end, version in new_kmls:
         window = tk.Toplevel(root)
         window.title(f"Discussion for {kml_filename}")
@@ -195,34 +163,40 @@ def prompt_for_discussions(new_kmls, discussion_file_path, root):
         submit_btn = ttk.Button(window, text="Submit", command=lambda k=kml_filename, e=entry, w=window: submit_discussion(k, e, w))
         submit_btn.pack(pady=5)
         
-        window.grab_set()
-        root.wait_window(window)
-    
+        window.grab_set()  # Make the window modal
+        root.wait_window(window)  # Wait for the window to close
+
+    # After all discussions are entered, append to file
     if discussions:
         with open(discussion_file_path, 'a', encoding='utf-8') as f:
             if not os.path.exists(discussion_file_path) or os.stat(discussion_file_path).st_size == 0:
-                f.write("# Format: [KML_FILENAME]\n# Discussion text goes here (can span multiple lines)\n# End with a blank line to separate entries\n\n")
+                f.write("# Format: [KML_FILENAME]\n"
+                        "# Discussion text goes here (can span multiple lines)\n"
+                        "# End with a blank line to separate entries\n\n")
+            # Write discussions for only the new KMLs that have been entered
             current_time = datetime.now().strftime('%d/%m/%Y %H:%M')
             for kml_filename, start, end, version in new_kmls:
                 if kml_filename in discussions:
-                    f.write(f"[{kml_filename}]\nConvective discussion for {start.strftime('%d/%m/%Y %H:%M')} to {end.strftime('%d/%m/%Y %H:%M')} Version {version}\nIssued at {current_time}\n\n{discussions[kml_filename]}\n\n")
+                    f.write(f"[{kml_filename}]\n"
+                            f"Convective discussion for {start.strftime('%d/%m/%Y %H:%M')} to {end.strftime('%d/%m/%Y %H:%M')}"
+                            f" Version {version}\n"
+                            f"Issued at {current_time}\n"
+                            f"\n{discussions[kml_filename]}\n\n")
+        #print(f"Appended {len(discussions)} new KML discussion entries to '{discussion_file_path}'")
 
-# Create interactive map with lightning layer
-def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_date, strikes):
-    uk_min_lat, uk_max_lat = uk_bounds['min_lat'], uk_bounds['max_lat']
-    uk_min_lon, uk_max_lon = uk_bounds['min_lon'], uk_bounds['max_lon']
-    center_lat = (uk_max_lat + uk_min_lat) / 2
-    center_lon = (uk_max_lon + uk_min_lon) / 2
+def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_date):
+    uk_min_lat, uk_max_lat = 47, 62
+    uk_min_lon, uk_max_lon = -11, 3
+    center_lat = 54.013176
+    center_lon = 2.3252278
     m = folium.Map(
         location=[center_lat, center_lon],
-        zoom_start=5,
+        zoom_start=7,
         max_bounds=[[uk_min_lat, uk_min_lon], [uk_max_lat, uk_max_lon]],
         tiles="https://api.mapbox.com/styles/v1/handry-outlook/cm6dn4z49008801s2f3qd29he/draft/tiles/{z}/{x}/{y}?access_token=" + mapbox_access_token,
         attr='Mapbox',
         zoom_control=False
     )
-    
-    # Define risk colors
     risk_colors = {
         'Low risk': '#5aac91',
         'Slight risk': 'yellow',
@@ -231,6 +205,17 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         'High risk': 'purple',
     }
 
+    # Initial lightning data fetch
+    lightning_url = "https://raw.githubusercontent.com/Handry-Outlook/lightning-map/main/strikes.json"
+    try:
+        response = requests.get(lightning_url)
+        response.raise_for_status()
+        initial_lightning_data = response.json()
+    except (requests.RequestException, ValueError) as e:
+        print(f"Failed to load initial lightning data: {e}")
+        initial_lightning_data = []
+
+    # Process outlooks (unchanged)
     current_outlooks = {}
     future_outlooks = {}
     for kml, (start, end, _, version) in all_kmls_data.items():
@@ -256,6 +241,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
 
     default_layer_id = default_kml.split(os.sep)[-1].replace('.kml', '') if default_kml else 'none'
 
+    # Add KML layers (unchanged)
     layer_groups = {}
     layer_definitions = {}
     for kml, (_, _, kml_data, _) in all_kmls_data.items():
@@ -275,70 +261,101 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         layer_groups[layer_id] = layer_group
         layer_definitions[layer_id] = kml_data.to_json()
 
-    # Add lightning strikes layer (as in your previous script)
-    lightning_layer = folium.FeatureGroup(name="Lightning Strikes", show=True)
-    strikes_geojson = {
-        "type": "FeatureCollection",
-        "features": [{
-            "type": "Feature",
-            "geometry": {"type": "Point", "coordinates": [s["lon"], s["lat"]]},
-            "properties": {"time": s["time"]}
-        } for s in strikes]
-    }
-    folium.GeoJson(
-        strikes_geojson,
-        style_function=lambda feature: {"color": "red", "radius": 5, "fill": True, "fillOpacity": 0.6},
-        popup=folium.GeoJsonPopup(fields=["time"], aliases=["Strike Time:"])
-    ).add_to(lightning_layer)
-    lightning_layer.add_to(m)
+    # Add Lightning Strike Layer (initially empty, populated via JS)
+    lightning_group = folium.FeatureGroup(name="Lightning Strikes", show=True)
+    lightning_group.add_to(m)
+    layer_groups['lightning_strikes'] = lightning_group
 
-    # Add time slider
-    min_time = min(strikes, key=lambda x: datetime.fromisoformat(x["time"]), default=datetime.now()).strftime("%Y-%m-%d %H:%M")
-    max_time = max(strikes, key=lambda x: datetime.fromisoformat(x["time"]), default=datetime.now()).strftime("%Y-%m-%d %H:%M")
-    slider_html = f'''
-    <div id="timeSlider" style="position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); background-color: rgba(255, 255, 255, 0.8); padding: 10px; border-radius: 5px; z-index: 1000;">
-        <label for="timeRange">Select Time: {min_time} to {max_time}</label><br>
-        <input type="range" id="timeRange" min="0" max="100" value="100" onchange="updateLightning(this.value)">
-    </div>
-    <script>
-        var lightningData = {json.dumps(strikes_geojson)};
-        var minTime = new Date("{min_time}").getTime();
-        var maxTime = new Date("{max_time}").getTime();
-        function updateLightning(value) {{
-            var map = {m.get_name()};
-            map.eachLayer(function(layer) {{
-                if (layer._leaflet_id === "Lightning Strikes") {{
-                    map.removeLayer(layer);
-                }}
-            }});
-            var timeThreshold = minTime + (maxTime - minTime) * (1 - value / 100);
-            var filteredFeatures = lightningData.features.filter(function(f) {{
-                return new Date(f.properties.time).getTime() >= timeThreshold;
-            }});
-            var newGeoJson = {{type: "FeatureCollection", features: filteredFeatures}};
-            L.geoJSON(newGeoJson, {{
-                pointToLayer: function(feature, latlng) {{
-                    return L.circleMarker(latlng, {{radius: 5, color: "red", fillOpacity: 0.6}});
-                }},
-                onEachFeature: function(feature, layer) {{
-                    layer.bindPopup("Strike Time: " + feature.properties.time);
-                }}
-            }}).addTo(map).bringToFront();
-        }}
-        updateLightning(100); // Initialize with all strikes
-    </script>
-    '''
+    # Bounds and icon (unchanged)
+    bounds = [[uk_min_lat, uk_min_lon], [uk_max_lat, uk_max_lon]]
+    folium.FitBounds(bounds).add_to(m)
 
-    # Fix the legend_html f-string
+    icon_url = "https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png"
+    icon_bounds = [[uk_max_lat, uk_min_lon], [uk_max_lat - 2, uk_min_lon + 4]]
+    folium.raster_layers.ImageOverlay(
+        name="Handry Outlook Icon",
+        image=icon_url,
+        bounds=icon_bounds,
+        opacity=1.0,
+        interactive=True,
+        cross_origin=True,
+        zindex=10000,
+    ).add_to(m)
+
+    # Calendar and risk data (unchanged)
+    risk_priority = {'High risk': 2, 'Moderate risk': 3, 'Enhanced risk': 4, 'Slight risk': 5, 'Low risk': 6}
+    risk_colors_cal = {'High risk': 'purple', 'Moderate risk': 'red', 'Enhanced risk': 'orange', 'Slight risk': 'yellow', 'Low risk': '#5aac91'}
+    date_risks = defaultdict(list)
+    kml_times = {}
+    kml_versions = {}
+    for kml, (kml_start, kml_end, kml_gdf, version) in all_kmls_data.items():
+        layer_id = kml.split(os.sep)[-1].replace('.kml', '')
+        kml_times[layer_id] = f"Valid: {kml_start.strftime('%d/%m/%Y %H:%M')} to {kml_end.strftime('%d/%m/%Y %H:%M')}"
+        kml_versions[layer_id] = f"{kml_start.strftime('%d/%m/%Y')} Version {version}"
+        current_date_iter = kml_start
+        while current_date_iter <= kml_end:
+            date_str = current_date_iter.strftime('%Y-%m-%d')
+            version_num = int(version)
+            base_date = kml_start.strftime('%d/%m/%Y')
+            label = f"{base_date} Version {version_num}"
+            unique_risks = set(row['Name'] for _, row in kml_gdf.iterrows())
+            risks_for_day = [(risk, layer_id, label, version_num) for risk in unique_risks]
+            date_risks[date_str].extend(risks_for_day)
+            current_date_iter += timedelta(days=1)
+
+    date_risks = dict(date_risks)
+    months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    current_year = current_date.year
+    years = list(range(current_year - 5, current_year + 6))
+    month_options = "".join(f'<option value="{i+1}" {"selected" if i+1 == current_date.month else ""}>{month}</option>' for i, month in enumerate(months))
+    year_options = "".join(f'<option value="{year}" {"selected" if year == current_year else ""}>{year}</option>' for year in years)
+
+    month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    next_month = (month_start.replace(month=month_start.month % 12 + 1) if month_start.month < 12 else month_start.replace(year=month_start.year + 1, month=1))
+    calendar_html = '<table id="calendarTable" style="border-collapse: collapse; width: 100%;"><tr><th colspan="7">' + month_start.strftime('%B %Y') + '</th></tr><tr>'
+    for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']:
+        calendar_html += f'<th style="font-size: 0.8em;">{day}</th>'
+    calendar_html += '</tr><tr>'
+    first_day = month_start.weekday()
+    for _ in range(first_day):
+        calendar_html += '<td></td>'
+    current_day = month_start
+    while current_day < next_month:
+        date_str = current_day.strftime('%Y-%m-%d')
+        risks = date_risks.get(date_str, [])
+        if risks:
+            primary_risks = [r for r, _, _, _ in risks if 'Risk of' not in r]
+            highest_risk = min(primary_risks, key=lambda x: risk_priority.get(x, 10)) if primary_risks else None
+            kml_id = risks[0][1] if risks else 'none'
+            bg_color = risk_colors_cal.get(highest_risk, 'white') if highest_risk else 'white'
+            has_risk_of = any('Risk of' in risk for risk, _, _, _ in risks)
+            border_style = 'border: 2px solid black' if has_risk_of else 'border: 1px solid black'
+            text_color = 'white' if bg_color in ['red', 'purple'] else 'black'
+        else:
+            bg_color = 'white'
+            border_style = 'border: 1px solid black'
+            kml_id = 'none'
+            text_color = 'black'
+        calendar_html += f'<td style="background-color: {bg_color}; {border_style}; text-align: center; cursor: pointer; color: {text_color}; font-size: 0.8em; padding: 0.2em;" onclick="selectDate(\'{date_str}\');">{current_day.day}</td>'
+        if current_day.weekday() == 6:
+            calendar_html += '</tr><tr>'
+        current_day += timedelta(days=1)
+    calendar_html += '</tr></table>'
+
     map_id = m.get_name()
     layer_groups_json = {k: v.get_name() for k, v in layer_groups.items()}
     current_date_str = current_date.strftime('%Y-%m-%d')
+    lightning_data_json = json.dumps(initial_lightning_data)
+
+    # Enhanced legend with BST/UTC, second slider, and unit selector
     legend_html = f'''
+    <!-- Valid time -->
     <div id="validTime" style="position: fixed; top: 1vh; left: 1vw; background-color: rgba(255, 255, 255, 0.8); padding: 0.5em 1em; border: 1px solid white; border-radius: 3px; z-index: 10001; font-size: 1.2em;">
         {(f"Future Outlook - {kml_times.get(default_layer_id)}" if default_kml and future_outlooks else kml_times.get(default_layer_id, "No outlook has been issued for this day. Use risk calendar to see archive"))}
     </div>
+    <!-- Legend Container -->
     <div id="legendContainer" style="position: fixed; bottom: 1vh; left: 0; width: 100%; background-color: white; border: 2px solid grey; z-index: 10000; font-size: 1em; padding: 0.5em; box-shadow: 0 -2px 6px rgba(0,0,0,0.3); box-sizing: border-box;">
-        <div id="legendBox" style="position: relative; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div id="legendBox" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;">
                     <div style="display: flex; align-items: center;"><i style="background: #5aac91; width: 1em; height: 1em; margin-right: 0.3em;"></i> Low risk</div>
@@ -347,24 +364,48 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
                     <div style="display: flex; align-items: center;"><i style="background: red; width: 1em; height: 1em; margin-right: 0.3em;"></i> Moderate risk</div>
                     <div style="display: flex; align-items: center;"><i style="background: purple; width: 1em; height: 1em; margin-right: 0.3em;"></i> High risk</div>
                     <div style="display: flex; align-items: center;"><i style="background: black; width: 1em; height: 1em; margin-right: 0.3em;"></i> Risk of severe thunderstorms</div>
+                    <div style="display: flex; align-items: center;"><i style="background: red; width: 1em; height: 1em; margin-right: 0.3em; border-radius: 50%;"></i> Newest Strikes</div>
+                    <div style="display: flex; align-items: center;"><i style="background: blue; width: 1em; height: 1em; margin-right: 0.3em; border-radius: 50%;"></i> Oldest Strikes</div>
                 </div>
             </div>
-            <select id="kmlDropdown" onchange="showLayer(this.value)" style="padding: 0.3em; font-size: 0.9em;"></select>
-            <button id="toggleLegend" onclick="toggleLegend()" style="min-height: 40px; cursor: pointer; font-size: 1em; padding: 0.3em 0.6em; box-sizing: border-box;">▲</button>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="toggleLightning" onclick="toggleLightning()" style="padding: 0.3em 0.6em; font-size: 0.9em; cursor: pointer;">Hide Lightning</button>
+                <select id="kmlDropdown" onchange="showLayer(this.value);" style="padding: 0.3em; font-size: 0.9em;"></select>
+                <button id="toggleLegend" onclick="toggleLegend()" style="min-height: 40px; cursor: pointer; font-size: 1em; padding: 0.3em 0.6em; box-sizing: border-box;">▲</button>
+            </div>
         </div>
         <div id="legendContent" style="display: none; margin-top: 0.5em; max-height: 70vh; overflow-y: auto;">
+            <!-- Lightning Sliders -->
+            <div style="margin-bottom: 0.5em;">
+                <button onclick="toggleSection('lightningSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Lightning Time Filter ►</button>
+                <div id="lightningSection" style="display: none;">
+                    <label for="timeSlider">Select End Time: <span id="timeDisplay"></span></label>
+                    <input type="range" id="timeSlider" min="0" max="1439" value="1439" step="1" style="width: 100%;" oninput="updateLightning()">
+                    <label for="rangeSlider">Show Strikes from: <span id="rangeDisplay"></span> ago</label>
+                    <input type="range" id="rangeSlider" min="1" max="24" value="3" step="1" style="width: 70%;" oninput="updateLightning()">
+                    <select id="unitSelector" onchange="updateRangeLimits(); updateLightning();" style="width: 25%; padding: 0.3em;">
+                        <option value="minutes">Minutes</option>
+                        <option value="hours" selected>Hours</option>
+                        <option value="days">Days</option>
+                        <option value="months">Months</option>
+                        <option value="years">Years</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Convective Discussion -->
             <div style="margin-bottom: 0.5em;">
                 <button onclick="toggleSection('discussionSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Convective Discussion ►</button>
                 <div id="discussionSection" style="display: none;">
                     <div id="discussionText" style="max-height: 15vh; overflow-y: auto; border: 1px solid #ccc; padding: 0.5em; white-space: pre-wrap; font-size: 0.9em;">Select an outlook to view discussion.</div>
                 </div>
             </div>
+            <!-- Risk Calendar -->
             <div>
                 <button onclick="toggleSection('calendarSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Risk Calendar ►</button>
                 <div id="calendarSection" style="display: none;">
                     <div style="display: flex; justify-content: space-between; width: 100%;">
-                        <select id="monthDropdown" onchange="updateCalendar()" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{month_options}</select>
-                        <select id="yearDropdown" onchange="updateCalendar()" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{year_options}</select>
+                        <select id="monthDropdown" onchange="updateCalendar();" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{month_options}</select>
+                        <select id="yearDropdown" onchange="updateCalendar();" style="width: 48%; padding: 0.3em; font-size: 0.9em;">{year_options}</select>
                     </div>
                     <br>
                     <div id="calendarContainer" style="width: 100%;">{calendar_html}</div>
@@ -376,6 +417,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             </div>
         </div>
     </div>
+    <!-- Styles -->
     <style>
         body {{
             margin: 0;
@@ -388,14 +430,8 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             align-items: center;
             position: relative;
         }}
-        #map_{map_id} {{
-            z-index: 1;
-            width: 100%;
-            height: 100%;
-        }}
-        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in,
-        .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{
-            display: none !important;
+        #legendContainer {{
+            transition: all 0.3s ease;
         }}
         @media (max-width: 600px) {{
             #validTime {{ font-size: 0.9em; padding: 0.3em 0.6em; }}
@@ -409,6 +445,15 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         @media (min-width: 601px) {{
             .leaflet-overlay-pane img {{ display: none !important; }}
         }}
+        #map_{map_id} {{
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+        }}
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in,
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{
+            display: none !important;
+        }}
     </style>
     <script>
     var layerGroups = {json.dumps(layer_groups_json, ensure_ascii=False)};
@@ -421,7 +466,45 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     var kmlTimes = {json.dumps(kml_times, ensure_ascii=False)};
     var kmlVersions = {json.dumps(kml_versions, ensure_ascii=False)};
     var currentDateStr = '{current_date_str}';
-    var lightningData = {json.dumps(strikes_geojson)};
+    var lightningData = {lightning_data_json};
+    var lightningLayer = null;
+    var lightningVisible = true;
+    var selectedDate = new Date('{current_date_str}');
+
+    function isBST(date) {{
+        var year = date.getFullYear();
+        var bstStart = new Date(Date.UTC(year, 2, 31 - (new Date(year, 2, 31).getDay() || 7), 1, 0, 0, 0)); // Last Sunday in March, 01:00 UTC
+        var bstEnd = new Date(Date.UTC(year, 9, 31 - (new Date(year, 9, 31).getDay() || 7), 1, 0, 0, 0)); // Last Sunday in October, 01:00 UTC
+        return date >= bstStart && date < bstEnd;
+    }}
+
+    function formatTime(hours, mins, isBst) {{
+        var displayHours = isBst ? (hours + 1) % 24 : hours;
+        return `${{String(displayHours).padStart(2, '0')}}:${{String(mins).padStart(2, '0')}} ${{isBst ? 'BST' : 'UTC'}}`;
+    }}
+
+    function getTimeDifferenceInMs(rangeValue, unit) {{
+        switch (unit) {{
+            case 'minutes': return rangeValue * 60 * 1000;
+            case 'hours': return rangeValue * 60 * 60 * 1000;
+            case 'days': return rangeValue * 24 * 60 * 60 * 1000;
+            case 'months': return rangeValue * 30 * 24 * 60 * 60 * 1000; // Approx
+            case 'years': return rangeValue * 365 * 24 * 60 * 60 * 1000; // Approx
+            default: return rangeValue * 60 * 60 * 1000; // Default to hours
+        }}
+    }}
+
+    function updateRangeLimits() {{
+        var unit = document.getElementById('unitSelector').value;
+        var slider = document.getElementById('rangeSlider');
+        switch (unit) {{
+            case 'minutes': slider.max = 1440; slider.value = Math.min(slider.value, 1440); break; // 24 hours
+            case 'hours': slider.max = 24; slider.value = Math.min(slider.value, 24); break;
+            case 'days': slider.max = 31; slider.value = Math.min(slider.value, 31); break;
+            case 'months': slider.max = 12; slider.value = Math.min(slider.value, 12); break;
+            case 'years': slider.max = 10; slider.value = Math.min(slider.value, 10); break;
+        }}
+    }}
 
     function toggleSection(sectionId) {{
         var section = document.getElementById(sectionId);
@@ -429,9 +512,8 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         if (section.style.display === 'none') {{
             section.style.display = 'block';
             button.innerHTML = button.innerHTML.replace('►', '▼');
-            if (sectionId === 'calendarSection') {{
-                updateCalendar();
-            }}
+            if (sectionId === 'calendarSection') {{ updateCalendar(); }}
+            if (sectionId === 'lightningSection') {{ updateLightning(); }}
         }} else {{
             section.style.display = 'none';
             button.innerHTML = button.innerHTML.replace('▼', '►');
@@ -442,7 +524,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         var map = {map_id};
         map.eachLayer(function(layer) {{
             if (layer instanceof L.GeoJSON || layer instanceof L.FeatureGroup) {{
-                map.removeLayer(layer);
+                if (layer !== lightningLayer) {{ map.removeLayer(layer); }}
             }}
         }});
         activeLayers = {{}};
@@ -464,7 +546,10 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
                     }};
                 }},
                 onEachFeature: function(feature, layer) {{
-                    layer.bindTooltip('<b>Risk Level:</b> ' + feature.properties.Name, {{sticky: true}});
+                    layer.bindTooltip(
+                        '<b>Risk Level:</b> ' + feature.properties.Name,
+                        {{sticky: true}}
+                    );
                     layer.on('click', function() {{
                         document.getElementById('discussionText').innerHTML = feature.properties.discussion || 'No discussion available.';
                     }});
@@ -479,14 +564,79 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             document.getElementById('discussionText').innerHTML = 'Select an outlook to view discussion.';
             document.getElementById('validTime').innerHTML = 'No convective outlook is available for this day, please select another day';
         }}
+        if (lightningVisible && lightningLayer) {{ lightningLayer.addTo(map); }}
         document.getElementById('kmlDropdown').value = layerId;
-        updateLightning(document.getElementById('timeRange').value); // Refresh lightning
+    }}
+
+    function updateLightning() {{
+        var map = {map_id};
+        if (lightningLayer) {{ map.removeLayer(lightningLayer); }}
+        var timeSlider = document.getElementById('timeSlider');
+        var rangeSlider = document.getElementById('rangeSlider');
+        var unitSelector = document.getElementById('unitSelector');
+        var minutes = parseInt(timeSlider.value);
+        var hours = Math.floor(minutes / 60);
+        var mins = minutes % 60;
+        var bst = isBST(selectedDate);
+        var selectedTime = new Date(selectedDate);
+        selectedTime.setUTCHours(hours, mins, 0, 0);
+        document.getElementById('timeDisplay').innerHTML = formatTime(hours, mins, bst);
+
+        var rangeValue = parseInt(rangeSlider.value);
+        var unit = unitSelector.value;
+        document.getElementById('rangeDisplay').innerHTML = `${{rangeValue}} ${{unit}}`;
+        var timeDiffMs = getTimeDifferenceInMs(rangeValue, unit);
+        var startTime = new Date(selectedTime.getTime() - timeDiffMs);
+
+        lightningLayer = L.featureGroup();
+        lightningData.forEach(function(strike) {{
+            var strikeTime = new Date(strike.time);
+            if (strikeTime >= startTime && strikeTime <= selectedTime) {{
+                var timeFraction = (selectedTime - strikeTime) / timeDiffMs;
+                var color = timeFraction < 0.25 ? 'red' :
+                            timeFraction < 0.5 ? 'orange' :
+                            timeFraction < 0.75 ? 'yellow' :
+                            timeFraction < 1.0 ? 'green' : 'blue';
+                L.circleMarker(
+                    [strike.lat, strike.lon],
+                    {{ radius: 5, color: color, fillColor: color, fillOpacity: 0.7, weight: 1 }}
+                ).addTo(lightningLayer).bindPopup(
+                    `Lightning Strike<br>Time: ${{strike.time}}`,
+                    {{ maxWidth: 200 }}
+                );
+            }}
+        }});
+        if (lightningVisible) {{ lightningLayer.addTo(map); }}
+    }}
+
+    function fetchLightningData() {{
+        fetch('{lightning_url}')
+            .then(response => response.json())
+            .then(data => {{
+                lightningData = data;
+                updateLightning();
+                console.log('Lightning data updated:', new Date());
+            }})
+            .catch(error => console.error('Error fetching lightning data:', error));
+    }}
+
+    function toggleLightning() {{
+        var map = {map_id};
+        lightningVisible = !lightningVisible;
+        var button = document.getElementById('toggleLightning');
+        if (lightningVisible) {{
+            if (lightningLayer) {{ lightningLayer.addTo(map); }}
+            button.innerHTML = 'Hide Lightning';
+        }} else {{
+            if (lightningLayer) {{ map.removeLayer(lightningLayer); }}
+            button.innerHTML = 'Show Lightning';
+        }}
     }}
 
     function updateCalendar() {{
         var monthDropdown = document.getElementById('monthDropdown');
         var yearDropdown = document.getElementById('yearDropdown');
-        if (!monthDropdown || !yearDropdown) return;
+        if (!monthDropdown || !yearDropdown) {{ return; }}
         var month = parseInt(monthDropdown.value);
         var year = parseInt(yearDropdown.value);
         var monthStart = new Date(year, month - 1, 1);
@@ -497,9 +647,13 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             monthStart.toLocaleString('default', {{month: 'long'}}) + ' ' + year + 
             '</th></tr><tr>';
         var days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        for (var day of days) calendarHtml += '<th style="font-size: 0.8em;">' + day + '</th>';
+        for (var day of days) {{
+            calendarHtml += '<th style="font-size: 0.8em;">' + day + '</th>';
+        }}
         calendarHtml += '</tr><tr>';
-        for (var i = 0; i < firstDay; i++) calendarHtml += '<td></td>';
+        for (var i = 0; i < firstDay; i++) {{
+            calendarHtml += '<td></td>';
+        }}
         while (currentDay < nextMonth) {{
             var dateStr = currentDay.toISOString().split('T')[0];
             var risks = dateRisks[dateStr] || [];
@@ -508,18 +662,22 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
             var textColor = 'black';
             var kmlId = 'none';
             if (risks.length > 0) {{
-                var primaryRisks = risks.filter(r => !r[0].includes('Risk of'));
+                var primaryRisks = risks.filter(function(risk) {{return !risk[0].includes('Risk of');}});
                 var highestRisk = primaryRisks.length > 0 ? 
-                    primaryRisks.reduce((min, curr) => (riskPriority[curr[0]] || 10) < (riskPriority[min[0]] || 10) ? curr : min)[0] : null;
+                    primaryRisks.reduce(function(min, curr) {{ 
+                        return (riskPriority[curr[0]] || 10) < (riskPriority[min[0]] || 10) ? curr : min; 
+                    }})[0] : null;
                 kmlId = risks[0][1];
                 bgColor = highestRisk ? riskColorsCal[highestRisk] || 'white' : 'white';
-                var hasRiskOf = risks.some(r => r[0].includes('Risk of'));
+                var hasRiskOf = risks.some(function(risk) {{return risk[0].includes('Risk of');}});
                 borderStyle = hasRiskOf ? 'border: 2px solid black' : 'border: 1px solid black';
                 textColor = (bgColor === 'red' || bgColor === 'purple') ? 'white' : 'black';
             }}
             calendarHtml += '<td style="background-color: ' + bgColor + '; ' + borderStyle + '; text-align: center; cursor: pointer; color: ' + textColor + '; font-size: 0.8em; padding: 0.2em;" ' +
-                'onclick="selectDate(\'' + dateStr + '\');">' + currentDay.getDate() + '</td>';
-            if (currentDay.getDay() === 0) calendarHtml += '</tr><tr>';
+                'onclick="selectDate(\\\'' + dateStr + '\\\');">' + currentDay.getDate() + '</td>';
+            if (currentDay.getDay() === 0) {{
+                calendarHtml += '</tr><tr>';
+            }}
             currentDay.setDate(currentDay.getDate() + 1);
         }}
         calendarHtml += '</tr></table>';
@@ -527,19 +685,24 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     }}
 
     function selectDate(dateStr) {{
+        selectedDate = new Date(dateStr);
         var dropdown = document.getElementById('kmlDropdown');
         dropdown.innerHTML = '<option value="none">None</option>';
         var risks = dateRisks[dateStr] || [];
         var uniqueKmlsMap = new Map();
-        risks.forEach(item => {{
+        risks.forEach(function(item) {{
             var risk = item[0];
             var kmlId = item[1];
             var label = item[2];
             var version = item[3];
-            if (!uniqueKmlsMap.has(kmlId)) uniqueKmlsMap.set(kmlId, {{kmlId: kmlId, label: label, version: version}});
+            if (!uniqueKmlsMap.has(kmlId)) {{
+                uniqueKmlsMap.set(kmlId, {{kmlId: kmlId, label: label, version: version}});
+            }}
         }});
-        var uniqueKmls = Array.from(uniqueKmlsMap.values()).sort((a, b) => b.version - a.version);
-        uniqueKmls.forEach(item => {{
+        var uniqueKmls = Array.from(uniqueKmlsMap.values()).sort(function(a, b) {{ 
+            return b.version - a.version; 
+        }});
+        uniqueKmls.forEach(function(item) {{
             var option = document.createElement('option');
             option.value = item.kmlId;
             option.text = item.label;
@@ -548,6 +711,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         var defaultOption = (uniqueKmls.length > 0) ? uniqueKmls[0].kmlId : 'none';
         dropdown.value = defaultOption;
         showLayer(defaultOption);
+        updateLightning();
     }}
 
     function toggleLegend() {{
@@ -574,8 +738,8 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
                     versions.push({{kmlId: kmlId, label: kmlVersions[kmlId], version: parseInt(kmlVersions[kmlId].split('Version ')[1])}});
                 }}
             }}
-            versions.sort((a, b) => b.version - a.version);
-            versions.forEach(item => {{
+            versions.sort(function(a, b) {{ return b.version - a.version; }});
+            versions.forEach(function(item) {{
                 var option = document.createElement('option');
                 option.value = item.kmlId;
                 option.text = item.label;
@@ -585,47 +749,26 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
         }}
     }}
 
-    var minTime = new Date(Math.min(...lightningData.features.map(f => new Date(f.properties.time).getTime())));
-    var maxTime = new Date(Math.max(...lightningData.features.map(f => new Date(f.properties.time).getTime())));
-    function updateLightning(value) {{
-        var map = {map_id};
-        map.eachLayer(function(layer) {{
-            if (layer._leaflet_id === "Lightning Strikes") {{
-                map.removeLayer(layer);
-            }}
-        }});
-        var timeThreshold = minTime.getTime() + (maxTime.getTime() - minTime.getTime()) * (1 - value / 100);
-        var filteredFeatures = lightningData.features.filter(f => new Date(f.properties.time).getTime() >= timeThreshold);
-        var newGeoJson = {{type: "FeatureCollection", features: filteredFeatures}};
-        L.geoJSON(newGeoJson, {{
-            pointToLayer: function(feature, latlng) {{
-                return L.circleMarker(latlng, {{radius: 5, color: "red", fillOpacity: 0.6}});
-            }},
-            onEachFeature: function(feature, layer) {{
-                layer.bindPopup("Strike Time: " + feature.properties.time);
-            }}
-        }}).addTo(map).bringToFront();
-    }}
-
     document.addEventListener('DOMContentLoaded', function() {{
         populateDropdown();
         showLayer(defaultLayerId);
         updateCalendar();
-        document.getElementById('timeRange').value = 100;
-        updateLightning(100);
+        updateRangeLimits();
+        updateLightning();
+        setInterval(fetchLightningData, 30000); // Fetch every 30 seconds
     }});
     </script>
     '''
-    m.get_root().html.add_child(folium.Element(slider_html))
     m.get_root().html.add_child(folium.Element(legend_html))
+    folium.LayerControl().add_to(m)
     return m
-
-# Analyze outlook data (unchanged)
 def analyze_outlook_data(all_kmls_data):
     monthly_data = defaultdict(lambda: defaultdict(int))
     yearly_data = defaultdict(lambda: defaultdict(int))
     risk_levels = ['Low risk', 'Slight risk', 'Enhanced risk', 'Moderate risk', 'High risk']
-    daily_latest_version = {}
+    daily_latest_version = {}  # Track latest version per day
+
+    # First pass: Identify the latest version per day
     for kml, (start, end, kml_data, version) in all_kmls_data.items():
         current_date = start
         while current_date <= end:
@@ -635,19 +778,25 @@ def analyze_outlook_data(all_kmls_data):
                 daily_latest_version[date_str] = (kml, version_num, kml_data)
             current_date += timedelta(days=1)
 
+    # Second pass: Count unique risks only from the latest version per day
     for date_str, (_, _, kml_data) in daily_latest_version.items():
         year = int(date_str[:4])
         month = int(date_str[5:7])
         month_key = f"{year}-{month:02d}"
+        # Use a set to ensure each risk level is counted only once per day (e.g., 3 "Slight risk" polygons = 1 count)
         unique_risks = set(row['Name'] for _, row in kml_data.iterrows() if row['Name'] in risk_levels)
         for risk in unique_risks:
             monthly_data[month_key][risk] += 1
             yearly_data[year][risk] += 1
 
-    return {month: dict(risks) for month, risks in monthly_data.items()}, {year: dict(risks) for year, risks in yearly_data.items()}
+    # Convert to JSON-friendly format
+    monthly_json = {month: dict(risks) for month, risks in monthly_data.items()}
+    yearly_json = {year: dict(risks) for year, risks in yearly_data.items()}
+    
+    return monthly_json, yearly_json
 
-# Create charts (unchanged)
 def create_monthly_chart_html(monthly_data, output_path):
+    # Icon image URL (assuming it's in the repository root)
     github_repo_url = "https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main"
     icon_image_url = f"{github_repo_url}/Handry_outlook_icon_pride_small.png"
     
@@ -669,7 +818,7 @@ def create_monthly_chart_html(monthly_data, output_path):
                 align-items: center;
                 min-height: 100vh;
                 overflow-x: hidden;
-                position: relative;
+                position: relative; /* For positioning the icon */
             }}
             h1 {{
                 font-size: 1.5em;
@@ -681,13 +830,14 @@ def create_monthly_chart_html(monthly_data, output_path):
                 max-width: 90vw;
                 height: 90vh !important;
             }}
+            /* Style for the icon */
             .handry-icon {{
                 position: fixed;
                 top: 10px;
                 right: 10px;
-                max-width: 50px;
+                max-width: 50px; /* Reasonable size for desktop */
                 height: auto;
-                z-index: 10000;
+                z-index: 10000; /* Ensure it’s above other elements */
             }}
             @media (max-width: 600px) {{
                 h1 {{
@@ -698,7 +848,7 @@ def create_monthly_chart_html(monthly_data, output_path):
                     height: 70vh !important;
                 }}
                 .handry-icon {{
-                    max-width: 30px;
+                    max-width: 30px; /* Smaller size for mobile */
                     top: 5px;
                     right: 5px;
                 }}
@@ -729,7 +879,7 @@ def create_monthly_chart_html(monthly_data, output_path):
                     maintainAspectRatio: false,
                     scales: {{
                         x: {{ stacked: false, title: {{ display: true, text: 'Month (YYYY-MM)', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }} }},
-                        y: {{ stacked: false, title: {{ display: true, text: 'Number of Days', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }}, beginAtZero: true }} }}
+                        y: {{ stacked: false, title: {{ display: true, text: 'Number of Days', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }}, beginAtZero: true }}
                     }},
                     plugins: {{
                         legend: {{ position: 'top', labels: {{ font: {{ size: 12 }}, padding: 10, boxWidth: 20 }} }},
@@ -747,6 +897,7 @@ def create_monthly_chart_html(monthly_data, output_path):
     #print(f"Monthly chart HTML saved as {output_path}")
 
 def create_yearly_chart_html(yearly_data, output_path):
+    # Icon image URL (assuming it's in the repository root)
     github_repo_url = "https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main"
     icon_image_url = f"{github_repo_url}/Handry_outlook_icon_pride_small.png"
     
@@ -768,7 +919,7 @@ def create_yearly_chart_html(yearly_data, output_path):
                 align-items: center;
                 min-height: 100vh;
                 overflow-x: hidden;
-                position: relative;
+                position: relative; /* For positioning the icon */
             }}
             h1 {{
                 font-size: 1.5em;
@@ -780,13 +931,14 @@ def create_yearly_chart_html(yearly_data, output_path):
                 max-width: 90vw;
                 height: 100vh !important;
             }}
+            /* Style for the icon */
             .handry-icon {{
                 position: fixed;
                 top: 10px;
                 right: 10px;
-                max-width: 50px;
+                max-width: 50px; /* Reasonable size for desktop */
                 height: auto;
-                z-index: 10000;
+                z-index: 10000; /* Ensure it’s above other elements */
             }}
             @media (max-width: 600px) {{
                 h1 {{
@@ -797,7 +949,7 @@ def create_yearly_chart_html(yearly_data, output_path):
                     height: 70vh !important;
                 }}
                 .handry-icon {{
-                    max-width: 30px;
+                    max-width: 30px; /* Smaller size for mobile */
                     top: 5px;
                     right: 5px;
                 }}
@@ -828,7 +980,7 @@ def create_yearly_chart_html(yearly_data, output_path):
                     maintainAspectRatio: false,
                     scales: {{
                         x: {{ stacked: false, title: {{ display: true, text: 'Year', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }} }},
-                        y: {{ stacked: false, title: {{ display: true, text: 'Number of Days', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }}, beginAtZero: true }} }}
+                        y: {{ stacked: false, title: {{ display: true, text: 'Number of Days', font: {{ size: 14 }} }}, ticks: {{ font: {{ size: 12 }} }}, beginAtZero: true }}
                     }},
                     plugins: {{
                         legend: {{ position: 'top', labels: {{ font: {{ size: 12 }}, padding: 10, boxWidth: 20 }} }},
@@ -844,19 +996,21 @@ def create_yearly_chart_html(yearly_data, output_path):
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
     #print(f"Yearly chart HTML saved as {output_path}")
-
+    
+# 7. Export Map as Image using Selenium
 def export_map_image(map_object, output_path, width=1360, height=1760):
     map_object.save("temp_map.html")
     chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument(f'--window-size={width},{height}')
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options, service=webdriver.chrome.service.Service(ChromeDriverManager().install()))
     driver.get(f"file://{os.path.abspath('temp_map.html')}")
     time.sleep(10)
     driver.save_screenshot(output_path)
     driver.quit()
 
+# 8. Overlay Template on Map
 def overlay_on_template(map_image_path, template_image_path, output_path, position=(0, 0)):
     map_img = Image.open(map_image_path).convert('RGBA')
     template = Image.open(template_image_path).convert('RGBA')
@@ -869,8 +1023,14 @@ def save_interactive_map(map_object, html_output_path, preview_image_name="map_p
     with open(html_output_path, 'r', encoding='utf-8') as f:
         html_content = f.read()
     
+    # Ensure the preview image is in the repository's root or a subfolder
     preview_image_path = os.path.join(os.path.dirname(html_output_path), preview_image_name)
+    
+    # Construct the OG image URL using the raw GitHub content URL
+    # Use raw.githubusercontent.com for direct file access
     og_image_url = f"{github_repo_url}/{preview_image_name}"
+    
+    # Icon image URL (assuming it's in the repository root)
     icon_image_url = f"{github_repo_url}/Handry_outlook_icon_pride_small.png"
     
     meta_tags = f'''
@@ -881,18 +1041,66 @@ def save_interactive_map(map_object, html_output_path, preview_image_name="map_p
     <meta property="og:type" content="website">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body {{margin:0;padding:0;width:100vw;height:100vh;overflow-x:hidden;display:flex;justify-content:center;align-items:center;position:relative}}
-        #map_{map_object.get_name()} {{width:100%;height:100%}}
-        .handry-icon {{position:fixed;top:10px;right:10px;max-width:150px;height:auto;z-index:10000}}
-        @media (max-width:600px) {{.handry-icon {{max-width:0px;top:5px;right:5px}}}}
-        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in, .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{display:none!important}}
+        body {{
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative; /* For positioning the icon */
+        }}
+        #map_{map_object.get_name()} {{
+            width: 100%;
+            height: 100%;
+        }}
+        /* Style for the icon */
+        .handry-icon {{
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            max-width: 150px; /* Reasonable size for desktop */
+            height: auto;
+            z-index: 10000; /* Ensure it’s above other elements */
+        }}
+        @media (max-width: 600px) {{
+            .handry-icon {{
+                max-width: 0px; /* Smaller size for mobile */
+                top: 5px;
+                right: 5px;
+            }}
+        }}
+        /* Hide Mapbox zoom controls */
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-in,
+        .mapboxgl-control-container .mapboxgl-ctrl-zoom-out {{
+            display: none !important;
+        }}
     </style>
     '''
+    # Add the icon image to the body
     icon_html = f'<img src="{icon_image_url}" alt="Handry Outlook Icon" class="handry-icon">'
-    updated_html = html_content.replace('<body>', f'<body>\n{icon_html}').replace('<head>', f'<head>\n{meta_tags}')
+    updated_html = html_content.replace('<body>', f'<body>\n{icon_html}')
+    updated_html = updated_html.replace('<head>', f'<head>\n{meta_tags}')
     
     with open(html_output_path, 'w', encoding='utf-8') as f:
         f.write(updated_html)
+    
+    # Verify the preview image exists and is committed to GitHub
+    #if not os.path.exists(preview_image_path):
+        #print(f"Warning: Preview image '{preview_image_path}' does not exist locally. Ensure it’s generated and committed.")
+    #else:
+        #print(f"Preview image found at {preview_image_path}")
+    
+    # Verify the icon image exists
+    icon_local_path = os.path.join(os.path.dirname(html_output_path), "Handry_outlook_icon_pride_small.png")
+    #if not os.path.exists(icon_local_path):
+        #print(f"Warning: Icon image '{icon_local_path}' does not exist locally. Ensure it’s in the repository and committed.")
+    #else:
+        #print(f"Icon image found at {icon_local_path}")
+    
+    #print(f"Interactive map saved as {html_output_path} with Open Graph, viewport, and CSS")
     return html_output_path
 
 def run_processing(root, status_label):
@@ -917,9 +1125,10 @@ def run_processing(root, status_label):
         rel_root = os.path.relpath(root_dir, uk_weather_dir)
         if rel_root == '.' or re.match(r'202[2-5](?:\\.*)?$', rel_root):
             for f in files:
-                if re.match(r"Convective Outlook(?: UPDAT(?:E|ED)(\d+)?)? \d{8} \d{4} - \d{8} \d{4}(?:\s*\(\d+\))?\.kml", f, re.IGNORECASE):
+                if re.match(r"Convective Outlook(?: UPDAT(?:E|ED)(\d+)?)? \d{8} \d{4} - \d{8} \d{4}(?:\s*\(\d+\))?\.kml", f, flags=re.IGNORECASE):
                     kml_files.append(os.path.join(root_dir, f))
 
+    # Proceed even if no KMLs
     if not kml_files:
         all_kmls_data = {}
     else:
@@ -935,14 +1144,11 @@ def run_processing(root, status_label):
                 all_kmls_data_raw[kml] = (start, end, cleaned_data, version)
         all_kmls_data = {kml: all_kmls_data_raw[kml] for kml in all_kmls_data_raw}
 
-    # Update and get strikes
-    strikes = update_strikes()
-
     monthly_data, yearly_data = analyze_outlook_data(all_kmls_data)
     create_monthly_chart_html(monthly_data, "monthly_charts.html")
     create_yearly_chart_html(yearly_data, "yearly_charts.html")
 
-    map_obj = create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_date, strikes)
+    map_obj = create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_date)
     export_map_image(map_obj, output_map_img)
     overlay_on_template(output_map_img, template_img, final_output, position=(3236, 0))
     save_interactive_map(map_obj, interactive_map_html, preview_image_name=preview_image)
@@ -956,8 +1162,7 @@ def run_processing(root, status_label):
         subprocess.run(["git", "add", preview_image], check=True)
         subprocess.run(["git", "add", "monthly_charts.html"], check=True)
         subprocess.run(["git", "add", "yearly_charts.html"], check=True)
-        subprocess.run(["git", "add", "strikes.json"], check=True)  # Add strikes file
-        subprocess.run(["git", "commit", "-m", "Update interactive map and strikes"], check=True)
+        subprocess.run(["git", "commit", "-m", "Update interactive map"], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
         webbrowser.open(github_url)
         status_label.config(text="Processing complete! Map uploaded.")
@@ -965,7 +1170,6 @@ def run_processing(root, status_label):
         status_label.config(text="Git operation failed. Check console.")
     except Exception as e:
         status_label.config(text="Error occurred. Check console.")
-
 def main():
     root = tk.Tk()
     root.title("Convective Outlook Processor")
