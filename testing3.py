@@ -206,7 +206,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     }
 
     # Initial lightning data fetch
-    lightning_url = "https://raw.githubusercontent.com/Handry-Outlook/lightning-map/main/strikes.json"
+    lightning_url = "https://raw.githubusercontent.com/Handry-Outlook/lightning-strikes/main/strikes.json"
     try:
         response = requests.get(lightning_url)
         response.raise_for_status()
@@ -346,6 +346,11 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
     layer_groups_json = {k: v.get_name() for k, v in layer_groups.items()}
     current_date_str = current_date.strftime('%Y-%m-%d')
     lightning_data_json = json.dumps(initial_lightning_data)
+    
+    # Calculate initial slider value based on current time
+    current_hours = current_date.hour
+    current_minutes = current_date.minute
+    initial_slider_value = current_hours * 60 + current_minutes  # Convert to minutes since midnight
 
     # Enhanced legend with BST/UTC, second slider, and unit selector
     legend_html = f'''
@@ -380,7 +385,7 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
                 <button onclick="toggleSection('lightningSection')" style="cursor: pointer; width: 100%; text-align: left; padding: 0.3em; font-size: 0.9em;">Lightning Time Filter ►</button>
                 <div id="lightningSection" style="display: none;">
                     <label for="timeSlider">Select End Time: <span id="timeDisplay"></span></label>
-                    <input type="range" id="timeSlider" min="0" max="1439" value="1439" step="1" style="width: 100%;" oninput="updateLightning()">
+                    <input type="range" id="timeSlider" min="0" max="1439" value="{initial_slider_value}" step="1" style="width: 100%;" oninput="updateLightning()">
                     <label for="rangeSlider">Show Strikes from: <span id="rangeDisplay"></span> ago</label>
                     <input type="range" id="rangeSlider" min="1" max="24" value="3" step="1" style="width: 70%;" oninput="updateLightning()">
                     <select id="unitSelector" onchange="updateRangeLimits(); updateLightning();" style="width: 25%; padding: 0.3em;">
@@ -595,12 +600,11 @@ def create_mapbox_map(all_kmls_data, mapbox_access_token, uk_bounds, current_dat
                 var timeFraction = (selectedTime - strikeTime) / timeDiffMs;
                 var color = timeFraction < 0.25 ? 'red' :
                             timeFraction < 0.5 ? 'orange' :
-                            timeFraction < 0.75 ? 'yellow' :
-                            timeFraction < 1.0 ? 'green' : 'blue';
+                            timeFraction < 0.75 ? 'yellow' : 'blue'; // Oldest strikes are blue
                 L.circleMarker(
                     [strike.lat, strike.lon],
                     {{ radius: 5, color: color, fillColor: color, fillOpacity: 0.7, weight: 1 }}
-                ).addTo(lightningLayer).bindPopup(
+                ).add_to(lightningLayer).bindPopup(
                     `Lightning Strike<br>Time: ${{strike.time}}`,
                     {{ maxWidth: 200 }}
                 );
