@@ -47,7 +47,7 @@
         canvas {
             width: 100% !important;
             max-width: 90vw;
-            height: 60vh !important;
+            height: 70vh !important; /* Increased from 60vh */
         }
         .handry-icon {
             position: fixed;
@@ -308,7 +308,9 @@
             const dataset = {
                 label: 'Lightning Strikes' + (selectedBounds ? ' (Selected Area)' : ' (UK)'),
                 data: labels.map(label => data[label] || 0),
-                backgroundColor: '#4682B4'
+                backgroundColor: '#ffca18',
+                barThickness: 50,
+                categoryPercentage: 0.8
             };
 
             console.log('Labels:', labels);
@@ -331,21 +333,23 @@
                         y: {
                             title: { display: true, text: 'Number of Strikes', font: { size: 14 } },
                             ticks: { font: { size: 12 } },
-                            beginAtZero: true
+                            beginAtZero: true,
+                            max: Math.ceil(Math.max(...dataset.data) * 1.1)
                         }
                     },
                     plugins: {
-                        legend: { position: 'top', labels: { font: { size: 12 }, padding: 10, boxWidth: 20 } },
+                        legend: { position: 'top', labels: { font: { size: 12 }, padding: 5, boxWidth: 20 } },
                         title: {
                             display: true,
                             text: `${resolution.charAt(0).toUpperCase() + resolution.slice(1)} Lightning Strikes` + 
                                   (selectedBounds ? ' in Selected Area' : ' Across the UK') + 
                                   ((document.getElementById('startDate').value || document.getElementById('endDate').value) ? 
                                    ` (${document.getElementById('startDate').value || 'Start'} - ${document.getElementById('endDate').value || 'End'})` : ''),
-                            font: { size: 16 }
+                            font: { size: 16 },
+                            padding: 5
                         }
                     },
-                    layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } }
+                    layout: { padding: { top: 5, bottom: 5, left: 5, right: 5 } }
                 }
             });
             console.log('Chart updated with', labels.length, 'data points');
