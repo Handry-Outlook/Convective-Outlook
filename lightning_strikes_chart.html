@@ -208,9 +208,16 @@
                 }
                 if (withinUK && withinBounds) {
                     const timestamp = strike.timestamp || strike.time;
-                    if (!timestamp) return;
+                    if (!timestamp) {
+                        console.warn('Skipping strike with missing timestamp:', strike);
+                        return;
+                    }
                     try {
                         const date = new Date(timestamp);
+                        if (isNaN(date.getTime())) {
+                            console.error('Invalid timestamp parsed as NaN:', timestamp);
+                            return;
+                        }
                         const timeMs = date.getTime();
                         minTimestamp = Math.min(minTimestamp, timeMs);
                         maxTimestamp = Math.max(maxTimestamp, timeMs);
@@ -241,12 +248,20 @@
 
             console.log(`Total strikes within selected area: ${strikeCount}`);
             console.log('Processed strikes by period:', strikesByPeriod);
-            console.log('Timestamp range:', new Date(minTimestamp).toISOString(), 'to', new Date(maxTimestamp).toISOString());
+            if (strikeCount > 0) {
+                console.log('Timestamp range:', new Date(minTimestamp).toISOString(), 'to', new Date(maxTimestamp).toISOString());
+            } else {
+                console.log('No valid strikes found within bounds or with valid timestamps.');
+            }
 
             if (strikeCount > 0 && Object.keys(strikesByPeriod).length === 0) {
-                const fallbackDate = new Date(minTimestamp).toISOString().split('T')[0];
-                strikesByPeriod[fallbackDate] = strikeCount;
-                console.log('Fallback applied: Aggregated all strikes to', fallbackDate);
+                if (minTimestamp === Infinity) {
+                    console.error('No valid timestamps processed; cannot apply fallback.');
+                } else {
+                    const fallbackDate = new Date(minTimestamp).toISOString().split('T')[0];
+                    strikesByPeriod[fallbackDate] = strikeCount;
+                    console.log('Fallback applied: Aggregated all strikes to', fallbackDate);
+                }
             }
 
             return strikesByPeriod;
