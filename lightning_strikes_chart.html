@@ -132,14 +132,14 @@
                 const layer = e.layer;
                 drawnItems.addLayer(layer);
                 selectedBounds = layer.getBounds();
-                console.log('Area selected:', selectedBounds.toBBoxString()); // Log selected bounds
+                console.log('Area selected:', selectedBounds.toBBoxString());
                 updateChart();
             });
 
             map.on(L.Draw.Event.EDITED, function (e) {
                 e.layers.eachLayer(function (layer) {
                     selectedBounds = layer.getBounds();
-                    console.log('Area edited:', selectedBounds.toBBoxString()); // Log edited bounds
+                    console.log('Area edited:', selectedBounds.toBBoxString());
                     updateChart();
                 });
             });
@@ -170,7 +170,15 @@
                     seen.add(key);
                     return true;
                 });
-                console.log('Lightning data fetched, total strikes:', lightningData.length); // Log total strikes fetched
+                console.log('Lightning data fetched, total strikes:', lightningData.length);
+                // Set default date range based on data
+                if (lightningData.length > 0) {
+                    const timestamps = lightningData.map(s => new Date(s.timestamp || s.time));
+                    const minDate = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
+                    const maxDate = new Date(Math.max(...timestamps)).toISOString().split('T')[0];
+                    document.getElementById('startDate').value = document.getElementById('startDate').value || minDate;
+                    document.getElementById('endDate').value = document.getElementById('endDate').value || maxDate;
+                }
                 updateChart();
             })
             .catch(error => console.error('Error fetching lightning data:', error));
@@ -185,7 +193,8 @@
                 return {};
             }
             const strikesByPeriod = {};
-            let strikeCount = 0; // Track strikes within selected area
+            let strikeCount = 0;
+
             lightningData.forEach(strike => {
                 const lat = parseFloat(strike.latitude || strike.lat || 0);
                 const lon = parseFloat(strike.longitude || strike.lon || 0);
@@ -227,7 +236,17 @@
                     }
                 }
             });
-            console.log(`Total strikes within selected area: ${strikeCount}`); // Log total strikes in area
+
+            console.log(`Total strikes within selected area: ${strikeCount}`);
+            console.log('Processed strikes by period:', strikesByPeriod);
+
+            // Fallback: If strikes exist but no periods are generated, aggregate to a single key
+            if (strikeCount > 0 && Object.keys(strikesByPeriod).length === 0) {
+                const fallbackDate = new Date(lightningData[0].timestamp || lightningData[0].time).toISOString().split('T')[0];
+                strikesByPeriod[fallbackDate] = strikeCount;
+                console.log('Fallback applied: Aggregated all strikes to', fallbackDate);
+            }
+
             return strikesByPeriod;
         }
 
@@ -240,7 +259,7 @@
 
         function updateChart() {
             const resolution = document.getElementById('resolutionSelector').value;
-            console.log('Updating chart with resolution:', resolution); // Log chart update start
+            console.log('Updating chart with resolution:', resolution);
             const data = processLightningData(resolution);
             const labels = Object.keys(data).sort();
             const dataset = {
@@ -248,6 +267,9 @@
                 data: labels.map(label => data[label] || 0),
                 backgroundColor: '#4682B4'
             };
+
+            console.log('Labels:', labels);
+            console.log('Dataset:', dataset);
 
             if (chart) chart.destroy();
 
@@ -283,14 +305,14 @@
                     layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } }
                 }
             });
-            console.log('Chart updated with', labels.length, 'data points'); // Log chart update completion
+            console.log('Chart updated with', labels.length, 'data points');
         }
 
         document.addEventListener('DOMContentLoaded', function() {
             initMinimap();
             fetchLightningData();
+            setInterval(fetchLightningData, 300000); // Refresh every 5 minutes
         });
-        setInterval(fetchLightningData, 300000);
     </script>
 </body>
 </html>
