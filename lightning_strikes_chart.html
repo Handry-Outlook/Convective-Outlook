@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lightning Strikes Over Time</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -34,10 +38,16 @@
             padding: 5px;
             font-size: 1em;
         }
+        #minimap {
+            width: 300px;
+            height: 200px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+        }
         canvas {
             width: 100% !important;
             max-width: 90vw;
-            height: 90vh !important;
+            height: 60vh !important;
         }
         .handry-icon {
             position: fixed;
@@ -51,7 +61,8 @@
             h1 { font-size: 1.2em; }
             #controls { flex-direction: column; gap: 5px; }
             #resolutionSelector, #refreshButton, #startDate, #endDate { font-size: 0.9em; width: 100%; }
-            canvas { max-width: 95vw; height: 70vh !important; }
+            #minimap { width: 100%; height: 150px; }
+            canvas { max-width: 95vw; height: 50vh !important; }
             .handry-icon { max-width: 30px; top: 5px; right: 5px; }
         }
     </style>
@@ -70,12 +81,76 @@
         <input type="date" id="endDate" onchange="updateChart()">
         <button id="refreshButton" onclick="fetchLightningData()">Refresh Data</button>
     </div>
+    <div id="minimap"></div>
     <canvas id="strikesChart"></canvas>
     <script>
         const lightningUrls = ["https://raw.githubusercontent.com/Handry-Outlook/lightning-map/main/strikes.json", "https://raw.githubusercontent.com/Handry6/lightning-map2/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HeiChitLuk/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map4/main/strikes.json"];
         const ukBounds = { minLat: 47.6, maxLat: 62.1, minLon: -13.7, maxLon: 7.4 };
         let lightningData = [];
         let chart;
+        let map;
+        let drawnItems;
+        let selectedBounds = null;
+
+        // Initialize the minimap
+        function initMinimap() {
+            map = L.map('minimap', {
+                center: [54.013176, -2.3252278],
+                zoom: 5,
+                minZoom: 4,
+                maxZoom: 10,
+                zoomControl: true
+            });
+
+            L.tileLayer('https://{
+                s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 18
+            }).addTo(map);
+
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            const drawControl = new L.Control.Draw({
+                edit: {
+                    featureGroup: drawnItems
+                },
+                draw: {
+                    polyline: false,
+                    polygon: false,
+                    circle: false,
+                    marker: false,
+                    circlemarker: false,
+                    rectangle: true
+                }
+            });
+            map.addControl(drawControl);
+
+            map.on(L.Draw.Event.CREATED, function (e) {
+                if (drawnItems.getLayers().length > 0) {
+                    drawnItems.clearLayers();
+                }
+                const layer = e.layer;
+                drawnItems.addLayer(layer);
+                selectedBounds = layer.getBounds();
+                updateChart();
+            });
+
+            map.on(L.Draw.Event.EDITED, function (e) {
+                e.layers.eachLayer(function (layer) {
+                    selectedBounds = layer.getBounds();
+                    updateChart();
+                });
+            });
+
+            map.on(L.Draw.Event.DELETED, function () {
+                selectedBounds = null;
+                updateChart();
+            });
+
+            // Set initial bounds to UK
+            map.fitBounds([[ukBounds.minLat, ukBounds.minLon], [ukBounds.maxLat, ukBounds.maxLon]]);
+        }
 
         function fetchLightningData() {
             Promise.all(
@@ -110,8 +185,12 @@
             lightningData.forEach(strike => {
                 const lat = parseFloat(strike.latitude || strike.lat || 0);
                 const lon = parseFloat(strike.longitude || strike.lon || 0);
-                if (lat >= ukBounds.minLat && lat <= ukBounds.maxLat &&
-                    lon >= ukBounds.minLon && lon <= ukBounds.maxLon) {
+                const withinUK = lat >= ukBounds.minLat && lat <= ukBounds.maxLat && lon >= ukBounds.minLon && lon <= ukBounds.maxLon;
+                let withinBounds = true;
+                if (selectedBounds) {
+                    withinBounds = selectedBounds.contains([lat, lon]);
+                }
+                if (withinUK && withinBounds) {
                     const timestamp = strike.timestamp || strike.time;
                     if (!timestamp) return;
                     try {
@@ -155,7 +234,7 @@
             const data = processLightningData(resolution);
             const labels = Object.keys(data).sort();
             const dataset = {
-                label: 'Lightning Strikes',
+                label: 'Lightning Strikes' + (selectedBounds ? ' (Selected Area)' : ' (UK)'),
                 data: labels.map(label => data[label] || 0),
                 backgroundColor: '#4682B4'
             };
@@ -184,7 +263,8 @@
                         legend: { position: 'top', labels: { font: { size: 12 }, padding: 10, boxWidth: 20 } },
                         title: {
                             display: true,
-                            text: `${resolution.charAt(0).toUpperCase() + resolution.slice(1)} Lightning Strikes Across the UK` + 
+                            text: `${resolution.charAt(0).toUpperCase() + resolution.slice(1)} Lightning Strikes` + 
+                                  (selectedBounds ? ' in Selected Area' : ' Across the UK') + 
                                   ((document.getElementById('startDate').value || document.getElementById('endDate').value) ? 
                                    ` (${document.getElementById('startDate').value || 'Start'} - ${document.getElementById('endDate').value || 'End'})` : ''),
                             font: { size: 16 }
@@ -195,7 +275,10 @@
             });
         }
 
-        document.addEventListener('DOMContentLoaded', fetchLightningData);
+        document.addEventListener('DOMContentLoaded', function() {
+            initMinimap();
+            fetchLightningData();
+        });
         setInterval(fetchLightningData, 300000);
     </script>
 </body>
