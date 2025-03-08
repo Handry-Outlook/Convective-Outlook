@@ -232,7 +232,7 @@
                         strikeCount++;
                     }
                 }
-                if (withinUK && withinBounds) {
+                if ((selectedBounds && withinBounds) || (!selectedBounds && withinUK)) {
                     const timestamp = strike.timestamp || strike.time;
                     if (!timestamp) {
                         console.warn('Skipping strike with missing timestamp:', strike);
