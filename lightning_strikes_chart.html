@@ -1,215 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightning Strikes Over Time</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        h1 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        #controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        #resolutionSelector, #refreshButton, #startDate, #endDate {
+            padding: 5px;
+            font-size: 1em;
+        }
+        canvas {
+            width: 100% !important;
+            max-width: 90vw;
+            height: 90vh !important;
+        }
+        .handry-icon {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            max-width: 50px;
+            height: auto;
+            z-index: 10000;
+        }
+        @media (max-width: 600px) {
+            h1 { font-size: 1.2em; }
+            #controls { flex-direction: column; gap: 5px; }
+            #resolutionSelector, #refreshButton, #startDate, #endDate { font-size: 0.9em; width: 100%; }
+            canvas { max-width: 95vw; height: 70vh !important; }
+            .handry-icon { max-width: 30px; top: 5px; right: 5px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Lightning Strikes Over Time</h1>
+    <img src="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png" alt="Handry Outlook Icon" class="handry-icon">
+    <div id="controls">
+        <select id="resolutionSelector" onchange="updateChart()">
+            <option value="daily">Daily Strikes</option>
+            <option value="weekly">Weekly Strikes</option>
+            <option value="monthly" selected>Monthly Strikes</option>
+            <option value="yearly">Yearly Strikes</option>
+        </select>
+        <input type="date" id="startDate" onchange="updateChart()">
+        <input type="date" id="endDate" onchange="updateChart()">
+        <button id="refreshButton" onclick="fetchLightningData()">Refresh Data</button>
+    </div>
+    <canvas id="strikesChart"></canvas>
+    <script>
+        const lightningUrls = ["https://raw.githubusercontent.com/Handry-Outlook/lightning-map/main/strikes.json", "https://raw.githubusercontent.com/Handry6/lightning-map2/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HeiChitLuk/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map4/main/strikes.json"];
+        const ukBounds = { minLat: 47.6, maxLat: 62.1, minLon: -13.7, maxLon: 7.4 };
+        let lightningData = [];
+        let chart;
 
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Lightning Strikes Over Time</title>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 10px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                min-height: 100vh;
-                overflow-x: hidden;
-                position: relative;
-            }
-            h1 {
-                font-size: 1.5em;
-                margin-bottom: 10px;
-                text-align: center;
-            }
-            #controls {
-                margin-bottom: 15px;
-                display: flex;
-                gap: 10px;
-                align-items: center;
-                flex-wrap: wrap;
-                justify-content: center;
-            }
-            #resolutionSelector, #refreshButton, #startDate, #endDate {
-                padding: 5px;
-                font-size: 1em;
-            }
-            canvas {
-                width: 100% !important;
-                max-width: 90vw;
-                height: 90vh !important;
-            }
-            .handry-icon {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                max-width: 50px;
-                height: auto;
-                z-index: 10000;
-            }
-            @media (max-width: 600px) {
-                h1 { font-size: 1.2em; }
-                #controls { flex-direction: column; gap: 5px; }
-                #resolutionSelector, #refreshButton, #startDate, #endDate { font-size: 0.9em; width: 100%; }
-                canvas { max-width: 95vw; height: 70vh !important; }
-                .handry-icon { max-width: 30px; top: 5px; right: 5px; }
-            }
-        </style>
-    </head>
-    <body>
-        <h1>Lightning Strikes Over Time</h1>
-        <img src="https://raw.githubusercontent.com/Handry-Outlook/Convective-Outlook/main/Handry_outlook_icon_pride_small.png" alt="Handry Outlook Icon" class="handry-icon">
-        <div id="controls">
-            <select id="resolutionSelector" onchange="updateChart()">
-                <option value="daily">Daily Strikes</option>
-                <option value="weekly">Weekly Strikes</option>
-                <option value="monthly" selected>Monthly Strikes</option>
-                <option value="yearly">Yearly Strikes</option>
-            </select>
-            <input type="date" id="startDate" onchange="updateChart()">
-            <input type="date" id="endDate" onchange="updateChart()">
-            <button id="refreshButton" onclick="fetchLightningData()">Refresh Data</button>
-        </div>
-        <canvas id="strikesChart"></canvas>
-        <script>
-            const lightningUrls = ["https://raw.githubusercontent.com/Handry-Outlook/lightning-map/main/strikes.json", "https://raw.githubusercontent.com/Handry6/lightning-map2/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HeiChitLuk/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map4/main/strikes.json"];
-            const ukBounds = { minLat: 47.6, maxLat: 62.1, minLon: -13.7, maxLon: 7.4 };
-            let lightningData = [];
-            let chart;
+        function fetchLightningData() {
+            Promise.all(
+                lightningUrls.map(url =>
+                    fetch(url)
+                        .then(response => response.json())
+                        .catch(error => { console.error(`Error fetching ${url}:`, error); return []; }))
+            )
+            .then(datasets => {
+                const combinedData = datasets.flat();
+                const seen = new Set();
+                lightningData = combinedData.filter(strike => {
+                    const key = `${strike.timestamp || strike.time || ''}|${strike.latitude || strike.lat || ''}|${strike.longitude || strike.lon || ''}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+                updateChart();
+            })
+            .catch(error => console.error('Error fetching lightning data:', error));
+        }
 
-            function fetchLightningData() {
-                Promise.all(
-                    lightningUrls.map(url => 
-                        fetch(url)
-                            .then(response => response.json())
-                            .catch(error => { console.error(`Error fetching ${url}:`, error); return []; }))
-                    )
-                )
-                .then(datasets => {
-                    const combinedData = datasets.flat();
-                    const seen = new Set();
-                    lightningData = combinedData.filter(strike => {
-                        const key = `${strike.timestamp || strike.time || ''}|${strike.latitude || strike.lat || ''}|${strike.longitude || strike.lon || ''}`;
-                        if (seen.has(key)) return false;
-                        seen.add(key);
-                        return true;
-                    });
-                    updateChart();
-                })
-                .catch(error => console.error('Error fetching lightning data:', error));
+        function processLightningData(resolution) {
+            const startDate = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+            const endDate = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+            if (endDate) endDate.setHours(23, 59, 59, 999);
+            if (startDate && endDate && startDate > endDate) {
+                alert('Start date must be before end date.');
+                return {};
             }
-
-            function processLightningData(resolution) {
-                const startDate = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
-                const endDate = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
-
-                // Adjust endDate to include the full day
-                if (endDate) endDate.setHours(23, 59, 59, 999);
-
-                // Validate date range
-                if (startDate && endDate && startDate > endDate) {
-                    alert('Start date must be before end date.');
-                    return {};
-                }
-
-                const strikesByPeriod = {};
-                lightningData.forEach(strike => {
-                    const lat = parseFloat(strike.latitude || strike.lat || 0);
-                    const lon = parseFloat(strike.longitude || strike.lon || 0);
-                    if (lat >= ukBounds.minLat && lat <= ukBounds.maxLat && 
-                        lon >= ukBounds.minLon && lon <= ukBounds.maxLon) {
-                        const timestamp = strike.timestamp || strike.time;
-                        if (!timestamp) return;
-                        try {
-                            const date = new Date(timestamp);
-                            // Filter by date range
-                            if ((startDate && date < startDate) || (endDate && date > endDate)) return;
-
-                            let key;
-                            switch (resolution) {
-                                case 'daily':
-                                    key = date.toISOString().split('T')[0];
-                                    break;
-                                case 'weekly':
-                                    const year = date.getUTCFullYear();
-                                    const week = String(getISOWeek(date)).padStart(2, '0');
-                                    key = `${year}-W${week}`;
-                                    break;
-                                case 'monthly':
-                                    key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-                                    break;
-                                case 'yearly':
-                                    key = String(date.getUTCFullYear());
-                                    break;
-                            }
-                            strikesByPeriod[key] = (strikesByPeriod[key] || 0) + 1;
-                        } catch (e) {
-                            console.error('Invalid timestamp:', timestamp, e);
+            const strikesByPeriod = {};
+            lightningData.forEach(strike => {
+                const lat = parseFloat(strike.latitude || strike.lat || 0);
+                const lon = parseFloat(strike.longitude || strike.lon || 0);
+                if (lat >= ukBounds.minLat && lat <= ukBounds.maxLat &&
+                    lon >= ukBounds.minLon && lon <= ukBounds.maxLon) {
+                    const timestamp = strike.timestamp || strike.time;
+                    if (!timestamp) return;
+                    try {
+                        const date = new Date(timestamp);
+                        if ((startDate && date < startDate) || (endDate && date > endDate)) return;
+                        let key;
+                        switch (resolution) {
+                            case 'daily':
+                                key = date.toISOString().split('T')[0];
+                                break;
+                            case 'weekly':
+                                const year = date.getUTCFullYear();
+                                const week = String(getISOWeek(date)).padStart(2, '0');
+                                key = `${year}-W${week}`;
+                                break;
+                            case 'monthly':
+                                key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+                                break;
+                            case 'yearly':
+                                key = String(date.getUTCFullYear());
+                                break;
                         }
+                        strikesByPeriod[key] = (strikesByPeriod[key] || 0) + 1;
+                    } catch (e) {
+                        console.error('Invalid timestamp:', timestamp, e);
                     }
-                });
-                return strikesByPeriod;
-            }
+                }
+            });
+            return strikesByPeriod;
+        }
 
-            function getISOWeek(date) {
-                const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-                d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-                return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-            }
+        function getISOWeek(date) {
+            const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
 
-            function updateChart() {
-                const resolution = document.getElementById('resolutionSelector').value;
-                const data = processLightningData(resolution);
-                const labels = Object.keys(data).sort();
-                const dataset = {
-                    label: 'Lightning Strikes',
-                    data: labels.map(label => data[label] || 0),
-                    backgroundColor: '#4682B4',
-                };
+        function updateChart() {
+            const resolution = document.getElementById('resolutionSelector').value;
+            const data = processLightningData(resolution);
+            const labels = Object.keys(data).sort();
+            const dataset = {
+                label: 'Lightning Strikes',
+                data: labels.map(label => data[label] || 0),
+                backgroundColor: '#4682B4'
+            };
 
-                if (chart) chart.destroy();
+            if (chart) chart.destroy();
 
-                const ctx = document.getElementById('strikesChart').getContext('2d');
-                chart = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels: labels, datasets: [dataset] },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: { 
-                                title: { display: true, text: resolution.charAt(0).toUpperCase() + resolution.slice(1) + ' Period', font: { size: 14 } },
-                                ticks: { font: { size: 12 } }
-                            },
-                            y: { 
-                                title: { display: true, text: 'Number of Strikes', font: { size: 14 } },
-                                ticks: { font: { size: 12 } },
-                                beginAtZero: true
-                            }
+            const ctx = document.getElementById('strikesChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [dataset] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: resolution.charAt(0).toUpperCase() + resolution.slice(1) + ' Period', font: { size: 14 } },
+                            ticks: { font: { size: 12 } }
                         },
-                        plugins: {
-                            legend: { position: 'top', labels: { font: { size: 12 }, padding: 10, boxWidth: 20 } },
-                            title: { 
-                                display: true, 
-                                text: resolution.charAt(0).toUpperCase() + resolution.slice(1) + ' Lightning Strikes Across the UK' + 
-                                      (document.getElementById('startDate').value || document.getElementById('endDate').value ? 
-                                       ` (${document.getElementById('startDate').value || 'Start'} - ${document.getElementById('endDate').value || 'End'})` : ''), 
-                                font: { size: 16 } 
-                            }
-                        },
-                        layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } }
-                    }
-                });
-            }
+                        y: {
+                            title: { display: true, text: 'Number of Strikes', font: { size: 14 } },
+                            ticks: { font: { size: 12 } },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 12 }, padding: 10, boxWidth: 20 } },
+                        title: {
+                            display: true,
+                            text: `${resolution.charAt(0).toUpperCase() + resolution.slice(1)} Lightning Strikes Across the UK` + 
+                                  ((document.getElementById('startDate').value || document.getElementById('endDate').value) ? 
+                                   ` (${document.getElementById('startDate').value || 'Start'} - ${document.getElementById('endDate').value || 'End'})` : ''),
+                            font: { size: 16 }
+                        }
+                    },
+                    layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } }
+                }
+            });
+        }
 
-            // Initial data fetch on page load
-            document.addEventListener('DOMContentLoaded', fetchLightningData);
-
-            // Optional: Auto-refresh every 5 minutes (300,000 ms)
-            setInterval(fetchLightningData, 300000);
-        </script>
-    </body>
-    </html>
-    
+        document.addEventListener('DOMContentLoaded', fetchLightningData);
+        setInterval(fetchLightningData, 300000);
+    </script>
+</body>
+</html>
