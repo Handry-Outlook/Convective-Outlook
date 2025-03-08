@@ -28,8 +28,10 @@
                 display: flex;
                 gap: 10px;
                 align-items: center;
+                flex-wrap: wrap;
+                justify-content: center;
             }
-            #resolutionSelector, #refreshButton {
+            #resolutionSelector, #refreshButton, #startDate, #endDate {
                 padding: 5px;
                 font-size: 1em;
             }
@@ -49,7 +51,7 @@
             @media (max-width: 600px) {
                 h1 { font-size: 1.2em; }
                 #controls { flex-direction: column; gap: 5px; }
-                #resolutionSelector, #refreshButton { font-size: 0.9em; width: 100%; }
+                #resolutionSelector, #refreshButton, #startDate, #endDate { font-size: 0.9em; width: 100%; }
                 canvas { max-width: 95vw; height: 70vh !important; }
                 .handry-icon { max-width: 30px; top: 5px; right: 5px; }
             }
@@ -65,6 +67,8 @@
                 <option value="monthly" selected>Monthly Strikes</option>
                 <option value="yearly">Yearly Strikes</option>
             </select>
+            <input type="date" id="startDate" onchange="updateChart()">
+            <input type="date" id="endDate" onchange="updateChart()">
             <button id="refreshButton" onclick="fetchLightningData()">Refresh Data</button>
         </div>
         <canvas id="strikesChart"></canvas>
@@ -97,6 +101,18 @@
             }
 
             function processLightningData(resolution) {
+                const startDate = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+                const endDate = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+
+                // Adjust endDate to include the full day
+                if (endDate) endDate.setHours(23, 59, 59, 999);
+
+                // Validate date range
+                if (startDate && endDate && startDate > endDate) {
+                    alert('Start date must be before end date.');
+                    return {};
+                }
+
                 const strikesByPeriod = {};
                 lightningData.forEach(strike => {
                     const lat = parseFloat(strike.latitude || strike.lat || 0);
@@ -107,6 +123,9 @@
                         if (!timestamp) return;
                         try {
                             const date = new Date(timestamp);
+                            // Filter by date range
+                            if ((startDate && date < startDate) || (endDate && date > endDate)) return;
+
                             let key;
                             switch (resolution) {
                                 case 'daily':
@@ -172,7 +191,13 @@
                         },
                         plugins: {
                             legend: { position: 'top', labels: { font: { size: 12 }, padding: 10, boxWidth: 20 } },
-                            title: { display: true, text: resolution.charAt(0).toUpperCase() + resolution.slice(1) + ' Lightning Strikes Across the UK', font: { size: 16 } }
+                            title: { 
+                                display: true, 
+                                text: resolution.charAt(0).toUpperCase() + resolution.slice(1) + ' Lightning Strikes Across the UK' + 
+                                      (document.getElementById('startDate').value || document.getElementById('endDate').value ? 
+                                       ` (${document.getElementById('startDate').value || 'Start'} - ${document.getElementById('endDate').value || 'End'})` : ''), 
+                                font: { size: 16 } 
+                            }
                         },
                         layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } }
                     }
