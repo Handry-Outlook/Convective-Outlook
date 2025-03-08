@@ -161,20 +161,46 @@
             )
             .then(datasets => {
                 const combinedData = datasets.flat();
-                const seen = new Set();
-                lightningData = combinedData.filter(strike => {
-                    const key = `${strike.timestamp || strike.time || ''}|${strike.latitude || strike.lat || ''}|${strike.longitude || strike.lon || ''}`;
-                    if (seen.has(key)) return false;
-                    seen.add(key);
-                    return true;
-                });
-                console.log('Lightning data fetched, total strikes:', lightningData.length);
+                console.log('Combined data size before filtering:', combinedData.length);
+
+                const seen = new Map();
+                lightningData = [];
+
+                const chunkSize = 10000;
+                for (let i = 0; i < combinedData.length; i += chunkSize) {
+                    const chunk = combinedData.slice(i, i + chunkSize);
+                    chunk.forEach(strike => {
+                        const time = strike.timestamp || strike.time || '';
+                        const lat = strike.latitude || strike.lat || '';
+                        const lon = strike.longitude || strike.lon || '';
+                        const key = `${time}|${lat}|${lon}`;
+                        if (!seen.has(key)) {
+                            seen.set(key, true);
+                            lightningData.push(strike);
+                        }
+                    });
+                }
+
+                console.log('Lightning data fetched, total unique strikes:', lightningData.length);
+
                 if (lightningData.length > 0) {
-                    const timestamps = lightningData.map(s => new Date(s.timestamp || s.time));
-                    const minDate = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
-                    const maxDate = new Date(Math.max(...timestamps)).toISOString().split('T')[0];
-                    document.getElementById('startDate').value = document.getElementById('startDate').value || minDate;
-                    document.getElementById('endDate').value = document.getElementById('endDate').value || maxDate;
+                    try {
+                        const timestamps = lightningData.map(s => {
+                            const ts = s.timestamp || s.time;
+                            const date = new Date(ts);
+                            return isNaN(date.getTime()) ? null : date;
+                        }).filter(t => t !== null);
+                        if (timestamps.length > 0) {
+                            const minDate = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
+                            const maxDate = new Date(Math.max(...timestamps)).toISOString().split('T')[0];
+                            document.getElementById('startDate').value = document.getElementById('startDate').value || minDate;
+                            document.getElementById('endDate').value = document.getElementById('endDate').value || maxDate;
+                        } else {
+                            console.warn('No valid timestamps found in lightning data.');
+                        }
+                    } catch (e) {
+                        console.error('Error processing timestamps:', e);
+                    }
                 }
                 updateChart();
             })
