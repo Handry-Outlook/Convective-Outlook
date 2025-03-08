@@ -34,7 +34,7 @@
             flex-wrap: wrap;
             justify-content: center;
         }
-        #resolutionSelector, #refreshButton, #startDate, #endDate {
+        #resolutionSelector, #refreshButton, #startDate, #endDate, #selectAreaButton, #doneButton {
             padding: 5px;
             font-size: 1em;
         }
@@ -43,11 +43,22 @@
             height: 200px;
             margin-bottom: 15px;
             border: 1px solid #ccc;
+            transition: all 0.3s ease;
+        }
+        #minimap.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1000;
+            border: none;
+            margin: 0;
         }
         canvas {
             width: 100% !important;
             max-width: 90vw;
-            height: 70vh !important; /* Increased from 60vh */
+            height: 70vh !important;
         }
         .handry-icon {
             position: fixed;
@@ -60,7 +71,7 @@
         @media (max-width: 600px) {
             h1 { font-size: 1.2em; }
             #controls { flex-direction: column; gap: 5px; }
-            #resolutionSelector, #refreshButton, #startDate, #endDate { font-size: 0.9em; width: 100%; }
+            #resolutionSelector, #refreshButton, #startDate, #endDate, #selectAreaButton, #doneButton { font-size: 0.9em; width: 100%; }
             #minimap { width: 100%; height: 150px; }
             canvas { max-width: 95vw; height: 50vh !important; }
             .handry-icon { max-width: 30px; top: 5px; right: 5px; }
@@ -80,6 +91,8 @@
         <input type="date" id="startDate" onchange="updateChart()">
         <input type="date" id="endDate" onchange="updateChart()">
         <button id="refreshButton" onclick="fetchLightningData()">Refresh Data</button>
+        <button id="selectAreaButton" onclick="toggleFullscreenMap()">Select Area</button>
+        <button id="doneButton" onclick="exitFullscreenMap()" style="display: none;">Done</button>
     </div>
     <div id="minimap"></div>
     <canvas id="strikesChart"></canvas>
@@ -91,6 +104,7 @@
         let map;
         let drawnItems;
         let selectedBounds = null;
+        let isFullscreen = false;
 
         function initMinimap() {
             map = L.map('minimap', {
@@ -132,14 +146,18 @@
                 drawnItems.addLayer(layer);
                 selectedBounds = layer.getBounds();
                 console.log('Area selected:', selectedBounds.toBBoxString());
-                updateChart();
+                if (isFullscreen) {
+                    exitFullscreenMap();
+                }
             });
 
             map.on(L.Draw.Event.EDITED, function (e) {
                 e.layers.eachLayer(function (layer) {
                     selectedBounds = layer.getBounds();
                     console.log('Area edited:', selectedBounds.toBBoxString());
-                    updateChart();
+                    if (isFullscreen) {
+                        exitFullscreenMap();
+                    }
                 });
             });
 
@@ -150,6 +168,33 @@
             });
 
             map.fitBounds([[ukBounds.minLat, ukBounds.minLon], [ukBounds.maxLat, ukBounds.maxLon]]);
+        }
+
+        function toggleFullscreenMap() {
+            const minimap = document.getElementById('minimap');
+            const selectButton = document.getElementById('selectAreaButton');
+            const doneButton = document.getElementById('doneButton');
+            if (!isFullscreen) {
+                minimap.classList.add('fullscreen');
+                selectButton.style.display = 'none';
+                doneButton.style.display = 'inline-block';
+                map.invalidateSize();
+                isFullscreen = true;
+            }
+        }
+
+        function exitFullscreenMap() {
+            const minimap = document.getElementById('minimap');
+            const selectButton = document.getElementById('selectAreaButton');
+            const doneButton = document.getElementById('doneButton');
+            if (isFullscreen) {
+                minimap.classList.remove('fullscreen');
+                selectButton.style.display = 'inline-block';
+                doneButton.style.display = 'none';
+                map.invalidateSize();
+                isFullscreen = false;
+                updateChart();
+            }
         }
 
         function fetchLightningData() {
