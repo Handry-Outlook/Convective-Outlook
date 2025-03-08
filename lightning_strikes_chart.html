@@ -103,7 +103,7 @@
             });
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
                 maxZoom: 18
             }).addTo(map);
 
@@ -132,18 +132,21 @@
                 const layer = e.layer;
                 drawnItems.addLayer(layer);
                 selectedBounds = layer.getBounds();
+                console.log('Area selected:', selectedBounds.toBBoxString()); // Log selected bounds
                 updateChart();
             });
 
             map.on(L.Draw.Event.EDITED, function (e) {
                 e.layers.eachLayer(function (layer) {
                     selectedBounds = layer.getBounds();
+                    console.log('Area edited:', selectedBounds.toBBoxString()); // Log edited bounds
                     updateChart();
                 });
             });
 
             map.on(L.Draw.Event.DELETED, function () {
                 selectedBounds = null;
+                console.log('Selection deleted, reverting to UK-wide data');
                 updateChart();
             });
 
@@ -167,6 +170,7 @@
                     seen.add(key);
                     return true;
                 });
+                console.log('Lightning data fetched, total strikes:', lightningData.length); // Log total strikes fetched
                 updateChart();
             })
             .catch(error => console.error('Error fetching lightning data:', error));
@@ -181,6 +185,7 @@
                 return {};
             }
             const strikesByPeriod = {};
+            let strikeCount = 0; // Track strikes within selected area
             lightningData.forEach(strike => {
                 const lat = parseFloat(strike.latitude || strike.lat || 0);
                 const lon = parseFloat(strike.longitude || strike.lon || 0);
@@ -188,6 +193,10 @@
                 let withinBounds = true;
                 if (selectedBounds) {
                     withinBounds = selectedBounds.contains([lat, lon]);
+                    if (withinBounds) {
+                        console.log(`Strike included: lat=${lat}, lon=${lon}, timestamp=${strike.timestamp || strike.time}`);
+                        strikeCount++;
+                    }
                 }
                 if (withinUK && withinBounds) {
                     const timestamp = strike.timestamp || strike.time;
@@ -218,6 +227,7 @@
                     }
                 }
             });
+            console.log(`Total strikes within selected area: ${strikeCount}`); // Log total strikes in area
             return strikesByPeriod;
         }
 
@@ -230,6 +240,7 @@
 
         function updateChart() {
             const resolution = document.getElementById('resolutionSelector').value;
+            console.log('Updating chart with resolution:', resolution); // Log chart update start
             const data = processLightningData(resolution);
             const labels = Object.keys(data).sort();
             const dataset = {
@@ -272,6 +283,7 @@
                     layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } }
                 }
             });
+            console.log('Chart updated with', labels.length, 'data points'); // Log chart update completion
         }
 
         document.addEventListener('DOMContentLoaded', function() {
