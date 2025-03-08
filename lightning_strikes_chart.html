@@ -92,7 +92,6 @@
         let drawnItems;
         let selectedBounds = null;
 
-        // Initialize the minimap
         function initMinimap() {
             map = L.map('minimap', {
                 center: [54.013176, -2.3252278],
@@ -150,7 +149,6 @@
                 updateChart();
             });
 
-            // Set initial bounds to UK
             map.fitBounds([[ukBounds.minLat, ukBounds.minLon], [ukBounds.maxLat, ukBounds.maxLon]]);
         }
 
@@ -171,7 +169,6 @@
                     return true;
                 });
                 console.log('Lightning data fetched, total strikes:', lightningData.length);
-                // Set default date range based on data
                 if (lightningData.length > 0) {
                     const timestamps = lightningData.map(s => new Date(s.timestamp || s.time));
                     const minDate = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
@@ -194,6 +191,8 @@
             }
             const strikesByPeriod = {};
             let strikeCount = 0;
+            let minTimestamp = Infinity;
+            let maxTimestamp = -Infinity;
 
             lightningData.forEach(strike => {
                 const lat = parseFloat(strike.latitude || strike.lat || 0);
@@ -212,6 +211,9 @@
                     if (!timestamp) return;
                     try {
                         const date = new Date(timestamp);
+                        const timeMs = date.getTime();
+                        minTimestamp = Math.min(minTimestamp, timeMs);
+                        maxTimestamp = Math.max(maxTimestamp, timeMs);
                         if ((startDate && date < startDate) || (endDate && date > endDate)) return;
                         let key;
                         switch (resolution) {
@@ -239,10 +241,10 @@
 
             console.log(`Total strikes within selected area: ${strikeCount}`);
             console.log('Processed strikes by period:', strikesByPeriod);
+            console.log('Timestamp range:', new Date(minTimestamp).toISOString(), 'to', new Date(maxTimestamp).toISOString());
 
-            // Fallback: If strikes exist but no periods are generated, aggregate to a single key
             if (strikeCount > 0 && Object.keys(strikesByPeriod).length === 0) {
-                const fallbackDate = new Date(lightningData[0].timestamp || lightningData[0].time).toISOString().split('T')[0];
+                const fallbackDate = new Date(minTimestamp).toISOString().split('T')[0];
                 strikesByPeriod[fallbackDate] = strikeCount;
                 console.log('Fallback applied: Aggregated all strikes to', fallbackDate);
             }
@@ -311,7 +313,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initMinimap();
             fetchLightningData();
-            setInterval(fetchLightningData, 300000); // Refresh every 5 minutes
+            setInterval(fetchLightningData, 300000);
         });
     </script>
 </body>
