@@ -34,26 +34,20 @@
             flex-wrap: wrap;
             justify-content: center;
         }
-        #resolutionSelector, #refreshButton, #startDate, #endDate, #selectAreaButton, #doneButton {
+        #resolutionSelector, #refreshButton, #startDate, #endDate {
             padding: 5px;
             font-size: 1em;
         }
         #minimap {
-            display: none; /* Hidden by default */
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 1000;
-            border: none;
-            margin: 0;
-            transition: all 0.3s ease;
+            width: 300px;
+            height: 200px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
         }
         canvas {
             width: 100% !important;
             max-width: 90vw;
-            height: 70vh !important;
+            height: 70vh !important; /* Increased from 60vh */
         }
         .handry-icon {
             position: fixed;
@@ -66,7 +60,8 @@
         @media (max-width: 600px) {
             h1 { font-size: 1.2em; }
             #controls { flex-direction: column; gap: 5px; }
-            #resolutionSelector, #refreshButton, #startDate, #endDate, #selectAreaButton, #doneButton { font-size: 0.9em; width: 100%; }
+            #resolutionSelector, #refreshButton, #startDate, #endDate { font-size: 0.9em; width: 100%; }
+            #minimap { width: 100%; height: 150px; }
             canvas { max-width: 95vw; height: 50vh !important; }
             .handry-icon { max-width: 30px; top: 5px; right: 5px; }
         }
@@ -85,8 +80,6 @@
         <input type="date" id="startDate" onchange="updateChart()">
         <input type="date" id="endDate" onchange="updateChart()">
         <button id="refreshButton" onclick="fetchLightningData()">Refresh Data</button>
-        <button id="selectAreaButton" onclick="showMap()">Select Area</button>
-        <button id="doneButton" onclick="hideMap()" style="display: none;">Done</button>
     </div>
     <div id="minimap"></div>
     <canvas id="strikesChart"></canvas>
@@ -139,14 +132,14 @@
                 drawnItems.addLayer(layer);
                 selectedBounds = layer.getBounds();
                 console.log('Area selected:', selectedBounds.toBBoxString());
-                hideMap();
+                updateChart();
             });
 
             map.on(L.Draw.Event.EDITED, function (e) {
                 e.layers.eachLayer(function (layer) {
                     selectedBounds = layer.getBounds();
                     console.log('Area edited:', selectedBounds.toBBoxString());
-                    hideMap();
+                    updateChart();
                 });
             });
 
@@ -157,30 +150,6 @@
             });
 
             map.fitBounds([[ukBounds.minLat, ukBounds.minLon], [ukBounds.maxLat, ukBounds.maxLon]]);
-        }
-
-        function showMap() {
-            const minimap = document.getElementById('minimap');
-            const selectButton = document.getElementById('selectAreaButton');
-            const doneButton = document.getElementById('doneButton');
-            minimap.style.display = 'block';
-            selectButton.style.display = 'none';
-            doneButton.style.display = 'inline-block';
-            if (!map) {
-                initMinimap();
-            } else {
-                map.invalidateSize();
-            }
-        }
-
-        function hideMap() {
-            const minimap = document.getElementById('minimap');
-            const selectButton = document.getElementById('selectAreaButton');
-            const doneButton = document.getElementById('doneButton');
-            minimap.style.display = 'none';
-            selectButton.style.display = 'inline-block';
-            doneButton.style.display = 'none';
-            updateChart();
         }
 
         function fetchLightningData() {
@@ -387,6 +356,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            initMinimap();
             fetchLightningData();
             setInterval(fetchLightningData, 300000);
         });
