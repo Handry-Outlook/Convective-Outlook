@@ -91,7 +91,7 @@
     <div id="minimap"></div>
     <canvas id="strikesChart"></canvas>
     <script>
-        const lightningUrls = ["https://raw.githubusercontent.com/Handry-Outlook/lightning-map/main/strikes.json", "https://raw.githubusercontent.com/Handry6/lightning-map/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HeiChitLuk/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map4/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map/main/strikes.json"];
+        const lightningUrls = ["https://raw.githubusercontent.com/HandryOutlook/lightning_data/main/lightning_data.json", "https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning"];
         const ukBounds = { minLat: 46.65, maxLat: 61.2, minLon: -11.8, maxLon: 2.4 };
         let lightningData = [];
         let chart;
@@ -188,6 +188,7 @@
                 lightningUrls.map(url =>
                     fetch(url)
                         .then(response => response.json())
+                        .then(data => data.lightning_strikes || [])
                         .catch(error => { console.error(`Error fetching ${url}:`, error); return []; }))
             )
             .then(datasets => {
@@ -197,37 +198,30 @@
                 const seen = new Map();
                 lightningData = [];
 
-                const chunkSize = 10000;
-                for (let i = 0; i < combinedData.length; i += chunkSize) {
-                    const chunk = combinedData.slice(i, i + chunkSize);
-                    chunk.forEach(strike => {
-                        const time = strike.timestamp || strike.time || '';
-                        const lat = strike.latitude || strike.lat || '';
-                        const lon = strike.longitude || strike.lon || '';
-                        const key = `${time}|${lat}|${lon}`;
-                        if (!seen.has(key)) {
-                            seen.set(key, true);
-                            lightningData.push(strike);
-                        }
-                    });
-                }
+                combinedData.forEach(strike => {
+                    const time = strike.strike_time;
+                    const [lon, lat] = strike.coordinates;
+                    const key = `${time}|${lat}|${lon}`;
+                    if (!seen.has(key)) {
+                        seen.set(key, true);
+                        lightningData.push({
+                            timestamp: time,
+                            latitude: lat,
+                            longitude: lon
+                        });
+                    }
+                });
 
                 console.log('Lightning data fetched, total unique strikes:', lightningData.length);
 
                 if (lightningData.length > 0) {
                     try {
-                        const timestamps = lightningData.map(s => {
-                            const ts = s.timestamp || s.time;
-                            const date = new Date(ts);
-                            return isNaN(date.getTime()) ? null : date;
-                        }).filter(t => t !== null);
+                        const timestamps = lightningData.map(s => new Date(s.timestamp)).filter(t => !isNaN(t.getTime()));
                         if (timestamps.length > 0) {
                             const minDate = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
                             const maxDate = new Date(Math.max(...timestamps)).toISOString().split('T')[0];
                             document.getElementById('startDate').value = document.getElementById('startDate').value || minDate;
                             document.getElementById('endDate').value = document.getElementById('endDate').value || maxDate;
-                        } else {
-                            console.warn('No valid timestamps found in lightning data.');
                         }
                     } catch (e) {
                         console.error('Error processing timestamps:', e);
