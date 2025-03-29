@@ -39,7 +39,7 @@
             font-size: 1em;
         }
         #minimap {
-            display: none; /* Hidden by default */
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
@@ -190,8 +190,8 @@
                         .then(response => response.json())
                         .then(data => data.lightning_strikes || [])
                         .catch(error => { console.error(`Error fetching ${url}:`, error); return []; }))
-            )
-            .then(datasets => {
+                )
+            ).then(datasets => {
                 const combinedData = datasets.flat();
                 console.log('Combined data size before filtering:', combinedData.length);
 
@@ -228,8 +228,7 @@
                     }
                 }
                 updateChart();
-            })
-            .catch(error => console.error('Error fetching lightning data:', error));
+            }).catch(error => console.error('Error fetching lightning data:', error));
         }
 
         function processLightningData(resolution) {
@@ -246,19 +245,19 @@
             let maxTimestamp = -Infinity;
 
             lightningData.forEach(strike => {
-                const lat = parseFloat(strike.latitude || strike.lat || 0);
-                const lon = parseFloat(strike.longitude || strike.lon || 0);
+                const lat = parseFloat(strike.latitude || 0);
+                const lon = parseFloat(strike.longitude || 0);
                 const withinUK = lat >= ukBounds.minLat && lat <= ukBounds.maxLat && lon >= ukBounds.minLon && lon <= ukBounds.maxLon;
                 let withinBounds = true;
                 if (selectedBounds) {
                     withinBounds = selectedBounds.contains([lat, lon]);
                     if (withinBounds) {
-                        console.log(`Strike included: lat=${lat}, lon=${lon}, timestamp=${strike.timestamp || strike.time}`);
+                        console.log(`Strike included: lat=${lat}, lon=${lon}, timestamp=${strike.timestamp}`);
                         strikeCount++;
                     }
                 }
                 if ((selectedBounds && withinBounds) || (!selectedBounds && withinUK)) {
-                    const timestamp = strike.timestamp || strike.time;
+                    const timestamp = strike.timestamp;
                     if (!timestamp) {
                         console.warn('Skipping strike with missing timestamp:', strike);
                         return;
