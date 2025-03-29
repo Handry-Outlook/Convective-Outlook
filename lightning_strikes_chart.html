@@ -190,7 +190,6 @@
                         .then(response => response.json())
                         .then(data => data.lightning_strikes || [])
                         .catch(error => { console.error(`Error fetching ${url}:`, error); return []; }))
-                )
             ).then(datasets => {
                 const combinedData = datasets.flat();
                 console.log('Combined data size before filtering:', combinedData.length);
