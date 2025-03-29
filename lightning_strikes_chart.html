@@ -91,7 +91,7 @@
     <div id="minimap"></div>
     <canvas id="strikesChart"></canvas>
     <script>
-        const lightningUrl = "['https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning', 'https://raw.githubusercontent.com/HandryOutlook/lightning_data/main/lightning_data.json']";
+        const lightningUrls = ["https://raw.githubusercontent.com/Handry-Outlook/lightning-map/main/strikes.json", "https://raw.githubusercontent.com/Handry6/lightning-map/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HeiChitLuk/lightning-map3/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map4/main/strikes.json", "https://raw.githubusercontent.com/HandryOutlook/lightning-map/main/strikes.json"];
         const ukBounds = { minLat: 46.65, maxLat: 61.2, minLon: -11.8, maxLon: 2.4 };
         let lightningData = [];
         let chart;
@@ -184,32 +184,58 @@
         }
 
         function fetchLightningData() {
-            fetch(lightningUrl)
-                .then(response => response.json())
-                .then(data => {
-                    lightningData = data.lightning_strikes.map(strike => ({
-                        timestamp: strike.strike_time,
-                        latitude: strike.coordinates[1],
-                        longitude: strike.coordinates[0]
-                    }));
-                    console.log('Lightning data fetched, total strikes:', lightningData.length);
+            Promise.all(
+                lightningUrls.map(url =>
+                    fetch(url)
+                        .then(response => response.json())
+                        .catch(error => { console.error(`Error fetching ${url}:`, error); return []; }))
+            )
+            .then(datasets => {
+                const combinedData = datasets.flat();
+                console.log('Combined data size before filtering:', combinedData.length);
 
-                    if (lightningData.length > 0) {
-                        try {
-                            const timestamps = lightningData.map(s => new Date(s.timestamp)).filter(t => !isNaN(t.getTime()));
-                            if (timestamps.length > 0) {
-                                const minDate = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
-                                const maxDate = new Date(Math.max(...timestamps)).toISOString().split('T')[0];
-                                document.getElementById('startDate').value = document.getElementById('startDate').value || minDate;
-                                document.getElementById('endDate').value = document.getElementById('endDate').value || maxDate;
-                            }
-                        } catch (e) {
-                            console.error('Error processing timestamps:', e);
+                const seen = new Map();
+                lightningData = [];
+
+                const chunkSize = 10000;
+                for (let i = 0; i < combinedData.length; i += chunkSize) {
+                    const chunk = combinedData.slice(i, i + chunkSize);
+                    chunk.forEach(strike => {
+                        const time = strike.timestamp || strike.time || '';
+                        const lat = strike.latitude || strike.lat || '';
+                        const lon = strike.longitude || strike.lon || '';
+                        const key = `${time}|${lat}|${lon}`;
+                        if (!seen.has(key)) {
+                            seen.set(key, true);
+                            lightningData.push(strike);
                         }
+                    });
+                }
+
+                console.log('Lightning data fetched, total unique strikes:', lightningData.length);
+
+                if (lightningData.length > 0) {
+                    try {
+                        const timestamps = lightningData.map(s => {
+                            const ts = s.timestamp || s.time;
+                            const date = new Date(ts);
+                            return isNaN(date.getTime()) ? null : date;
+                        }).filter(t => t !== null);
+                        if (timestamps.length > 0) {
+                            const minDate = new Date(Math.min(...timestamps)).toISOString().split('T')[0];
+                            const maxDate = new Date(Math.max(...timestamps)).toISOString().split('T')[0];
+                            document.getElementById('startDate').value = document.getElementById('startDate').value || minDate;
+                            document.getElementById('endDate').value = document.getElementById('endDate').value || maxDate;
+                        } else {
+                            console.warn('No valid timestamps found in lightning data.');
+                        }
+                    } catch (e) {
+                        console.error('Error processing timestamps:', e);
                     }
-                    updateChart();
-                })
-                .catch(error => console.error('Error fetching lightning data:', error));
+                }
+                updateChart();
+            })
+            .catch(error => console.error('Error fetching lightning data:', error));
         }
 
         function processLightningData(resolution) {
@@ -222,45 +248,79 @@
             }
             const strikesByPeriod = {};
             let strikeCount = 0;
+            let minTimestamp = Infinity;
+            let maxTimestamp = -Infinity;
 
             lightningData.forEach(strike => {
-                const lat = parseFloat(strike.latitude);
-                const lon = parseFloat(strike.longitude);
+                const lat = parseFloat(strike.latitude || strike.lat || 0);
+                const lon = parseFloat(strike.longitude || strike.lon || 0);
                 const withinUK = lat >= ukBounds.minLat && lat <= ukBounds.maxLat && lon >= ukBounds.minLon && lon <= ukBounds.maxLon;
                 let withinBounds = true;
                 if (selectedBounds) {
                     withinBounds = selectedBounds.contains([lat, lon]);
-                    if (withinBounds) strikeCount++;
+                    if (withinBounds) {
+                        console.log(`Strike included: lat=${lat}, lon=${lon}, timestamp=${strike.timestamp || strike.time}`);
+                        strikeCount++;
+                    }
                 }
                 if ((selectedBounds && withinBounds) || (!selectedBounds && withinUK)) {
-                    const date = new Date(strike.timestamp);
-                    if (isNaN(date.getTime())) {
-                        console.error('Invalid timestamp:', strike.timestamp);
+                    const timestamp = strike.timestamp || strike.time;
+                    if (!timestamp) {
+                        console.warn('Skipping strike with missing timestamp:', strike);
                         return;
                     }
-                    if ((startDate && date < startDate) || (endDate && date > endDate)) return;
-                    let key;
-                    switch (resolution) {
-                        case 'daily':
-                            key = date.toISOString().split('T')[0];
-                            break;
-                        case 'weekly':
-                            const year = date.getUTCFullYear();
-                            const week = String(getISOWeek(date)).padStart(2, '0');
-                            key = `${year}-W${week}`;
-                            break;
-                        case 'monthly':
-                            key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-                            break;
-                        case 'yearly':
-                            key = String(date.getUTCFullYear());
-                            break;
+                    try {
+                        const date = new Date(timestamp);
+                        if (isNaN(date.getTime())) {
+                            console.error('Invalid timestamp parsed as NaN:', timestamp);
+                            return;
+                        }
+                        const timeMs = date.getTime();
+                        minTimestamp = Math.min(minTimestamp, timeMs);
+                        maxTimestamp = Math.max(maxTimestamp, timeMs);
+                        if ((startDate && date < startDate) || (endDate && date > endDate)) return;
+                        let key;
+                        switch (resolution) {
+                            case 'daily':
+                                key = date.toISOString().split('T')[0];
+                                break;
+                            case 'weekly':
+                                const year = date.getUTCFullYear();
+                                const week = String(getISOWeek(date)).padStart(2, '0');
+                                key = `${year}-W${week}`;
+                                break;
+                            case 'monthly':
+                                key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+                                break;
+                            case 'yearly':
+                                key = String(date.getUTCFullYear());
+                                break;
+                        }
+                        strikesByPeriod[key] = (strikesByPeriod[key] || 0) + 1;
+                    } catch (e) {
+                        console.error('Invalid timestamp:', timestamp, e);
                     }
-                    strikesByPeriod[key] = (strikesByPeriod[key] || 0) + 1;
                 }
             });
 
             console.log(`Total strikes within selected area: ${strikeCount}`);
+            console.log('Processed strikes by period:', strikesByPeriod);
+            if (strikeCount > 0) {
+                console.log('Timestamp range:', new Date(minTimestamp).toISOString(), 'to', new Date(maxTimestamp).toISOString());
+            } else {
+                console.log('No valid strikes found within bounds or with valid timestamps.');
+            }
+
+            if (strikeCount > 0 && Object.keys(strikesByPeriod).length === 0) {
+                if (minTimestamp === Infinity) {
+                    console.error('No valid timestamps processed; cannot apply fallback.');
+                } else {
+                    const fallbackDate = new Date(minTimestamp).toISOString().split('T')[0];
+                    strikesByPeriod[fallbackDate] = strikeCount;
+                    console.log('Fallback applied: Aggregated all strikes to', fallbackDate);
+                }
+            }
+
             return strikesByPeriod;
         }
 
