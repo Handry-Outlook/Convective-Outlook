@@ -91,7 +91,7 @@
     <div id="minimap"></div>
     <canvas id="strikesChart"></canvas>
     <script>
-        const lightningUrl = "https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning";
+        const lightningUrl = "['https://data.consumer-digital.api.metoffice.gov.uk/v1/lightning', 'https://raw.githubusercontent.com/HandryOutlook/lightning_data/main/lightning_data.json']";
         const ukBounds = { minLat: 46.65, maxLat: 61.2, minLon: -11.8, maxLon: 2.4 };
         let lightningData = [];
         let chart;
